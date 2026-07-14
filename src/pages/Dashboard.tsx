@@ -3,80 +3,115 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "../context/AppContext";
-import { seedSampleData } from "../utils/dummyHelper";
-import { 
-  IndianRupee, 
-  TrendingUp, 
-  AlertCircle, 
-  Sparkles, 
-  ArrowRight, 
-  Users, 
-  Calendar,
+import { calculateBalances } from "../lib/settleEngine";
+import {
+  IndianRupee,
+  Sparkles,
+  ArrowRight,
+  Users,
   Layers,
   ArrowUpRight,
   ArrowDownLeft,
-  Activity as ActivityIcon,
   ChevronRight,
-  ShieldCheck,
   Zap
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { 
-  faPiggyBank, 
-  faArrowTrendUp, 
+import {
+  faPiggyBank,
+  faArrowTrendUp,
   faArrowTrendDown,
   faHouse,
   faTicket,
   faUtensils,
-  faGasPump
+  faGasPump,
+  faHeartPulse,
+  faReceipt
 } from "@fortawesome/free-solid-svg-icons";
 
+// Human-friendly labels + icons for the raw category keys used on expenses.
+const CATEGORY_META: Record<string, { label: string; faIcon: any }> = {
+  rent: { label: "Accommodation & Rent", faIcon: faHouse },
+  food: { label: "Dining & Food", faIcon: faUtensils },
+  travel: { label: "Travel & Transport", faIcon: faGasPump },
+  entertainment: { label: "Activities & Entertainment", faIcon: faTicket },
+  healthcare: { label: "Healthcare", faIcon: faHeartPulse },
+  others: { label: "Others", faIcon: faReceipt }
+};
+
+const catMeta = (key: string) =>
+  CATEGORY_META[key] || { label: key.charAt(0).toUpperCase() + key.slice(1), faIcon: faReceipt };
+
+const BAR_COLORS = ["bg-cyan-500", "bg-slate-500", "bg-slate-700", "bg-gray-400", "bg-gray-300"];
+
 export const Dashboard: React.FC = () => {
-  const { user, profile, groups, navigate, theme } = useApp();
-  const [loadingSeed, setLoadingSeed] = useState(false);
-  const [successSeed, setSuccessSeed] = useState(false);
+  const { user, profile, groups, allExpenses, navigate, theme } = useApp();
 
   // Gemini state
   const [aiInsights, setAiInsights] = useState<{ type: string; title: string; message: string }[]>([]);
   const [loadingInsights, setLoadingInsights] = useState(false);
 
-  // Seed sample data callback
-  const handleSeed = async () => {
-    if (!user) return;
-    setLoadingSeed(true);
-    try {
-      await seedSampleData(user.uid, profile?.name || user.displayName || "Me", user.email || "");
-      setSuccessSeed(true);
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (err) {
-      console.error("Error seeding sample data:", err);
-    } finally {
-      setLoadingSeed(false);
-    }
-  };
+  // --- Real, computed metrics (settlement offset entries excluded from "spend") ---
+  const spendExpenses = useMemo(
+    () => allExpenses.filter((e) => e.category !== "settlement"),
+    [allExpenses]
+  );
 
-  // Fetch or trigger server-side Gemini insights
+  const totalSpent = useMemo(
+    () => spendExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+    [spendExpenses]
+  );
+
+  // Net balance of the current user across all groups (includes settlement offsets).
+  const { youOwe, youAreOwed } = useMemo(() => {
+    let owe = 0;
+    let owed = 0;
+    if (user) {
+      groups.forEach((g) => {
+        const groupExpenses = allExpenses.filter((e) => e.groupId === g.id);
+        if (groupExpenses.length === 0) return;
+        const balances = calculateBalances(g.members, groupExpenses);
+        const net = balances[user.uid] || 0;
+        if (net < -0.01) owe += Math.abs(net);
+        else if (net > 0.01) owed += net;
+      });
+    }
+    return {
+      youOwe: Math.round(owe * 100) / 100,
+      youAreOwed: Math.round(owed * 100) / 100
+    };
+  }, [user, groups, allExpenses]);
+
+  // Category distribution across all real spend.
+  const categoryList = useMemo(() => {
+    const totals: Record<string, number> = {};
+    spendExpenses.forEach((e) => {
+      totals[e.category] = (totals[e.category] || 0) + (e.amount || 0);
+    });
+    return Object.entries(totals)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [spendExpenses]);
+
+  // Fetch server-side Gemini insights from REAL expenses only.
   const loadAInsights = async () => {
-    if (groups.length === 0) return;
+    if (spendExpenses.length === 0) return;
     setLoadingInsights(true);
     try {
-      const activeGroupObj = groups[0];
+      const mergedNames: Record<string, string> = {};
+      groups.forEach((g) => Object.assign(mergedNames, g.memberNames || {}));
       const res = await fetch("/api/gemini/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          expenses: [
-            { title: "Vagator Villa Stay", amount: 15000, category: "rent" },
-            { title: "Thalassa Dinner", amount: 4500, category: "food" },
-            { title: "Scuba Diving tickets", amount: 6000, category: "entertainment" },
-            { title: "Fuel & Thar Rent", amount: 3200, category: "travel" }
-          ],
-          budget: activeGroupObj.budget || 35000,
-          memberNames: activeGroupObj.memberNames || {}
+          expenses: spendExpenses.map((e) => ({
+            title: e.title,
+            amount: e.amount,
+            category: e.category
+          })),
+          budget: groups.reduce((sum, g) => sum + (g.budget || 0), 0),
+          memberNames: mergedNames
         })
       });
       if (res.ok) {
@@ -91,19 +126,17 @@ export const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    if (groups.length > 0) {
+    if (spendExpenses.length > 0) {
       loadAInsights();
+    } else {
+      setAiInsights([]);
     }
-  }, [groups]);
-
-  // Calculations for dashboard counters
-  const demoTotalSpent = groups.length > 0 ? 28700 : 0;
-  const demoOwes = groups.length > 0 ? 6366 : 0;
-  const demoGets = groups.length > 0 ? 5433 : 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spendExpenses.length]);
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col gap-10">
-      
+
       {/* Hero Welcome banner */}
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-5 border-b pb-8 ${
         theme === "dark" ? "border-white/5" : "border-gray-100"
@@ -113,20 +146,20 @@ export const Dashboard: React.FC = () => {
           <h1 className={`font-sans font-black text-3.5xl tracking-tight leading-tight uppercase ${
             theme === "dark" ? "text-white" : "text-slate-900"
           }`}>
-            Hi, {profile?.name?.split(" ")[0] || "there"}
+            Hi, {profile?.nickname || profile?.name?.split(" ")[0] || "there"}
           </h1>
           <p className="text-sm text-gray-500 leading-normal max-w-lg">
             Track clearly, split fairly, and settle up on the screen in seconds. No awkward reminders. Only good times.
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3 shrink-0">
           <button
             id="explore-network-banner-btn"
             onClick={() => navigate("/network")}
             className={`flex items-center gap-2 py-3 px-5 border text-xs font-bold leading-none uppercase font-mono tracking-wider rounded-xl cursor-pointer ${
-              theme === "dark" 
-                ? "border-cyan-500/20 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-500/10" 
+              theme === "dark"
+                ? "border-cyan-500/20 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-500/10"
                 : "border-slate-200 bg-white hover:bg-slate-50 text-slate-800"
             }`}
           >
@@ -136,7 +169,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Blank State Warning & Quick Seed */}
+      {/* Empty State — no fake data, just a real CTA to create the first group */}
       {groups.length === 0 && (
         <div className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center text-center gap-5 ${
           theme === "dark" ? "border-white/10 bg-slate-900/10" : "border-gray-200 bg-white"
@@ -149,27 +182,26 @@ export const Dashboard: React.FC = () => {
           <div className="flex flex-col gap-1">
             <h3 className={`text-base font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>No Active Balance Groups</h3>
             <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
-              Create a group manually or seed our standard "Goa Trip 🌊" sample pack to immediately experience all premium dashboards and settle suggested debts!
+              Create your first group to start tracking shared expenses. Everything on your dashboard is built from the spends you and your group members log — nothing is pre-filled.
             </p>
           </div>
           <button
-            id="seed-demo-btn"
-            disabled={loadingSeed}
-            onClick={handleSeed}
+            id="create-first-group-btn"
+            onClick={() => navigate("/groups")}
             className={`py-3 px-6 font-bold font-mono text-xs tracking-wider uppercase rounded-xl transition-all cursor-pointer shadow-sm ${
               theme === "dark"
                 ? "bg-cyan-500 text-black hover:bg-cyan-400"
                 : "bg-black text-white hover:bg-slate-900"
             }`}
           >
-            {loadingSeed ? "Setting up database..." : successSeed ? "Got it! Seeding..." : "Instant Live Seed (Goa Trip 🌊)"}
+            Create a Group
           </button>
         </div>
       )}
 
       {/* Bento Stats Panels Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-        
+
         {/* Total spent card */}
         <div className={`border rounded-2xl p-6 flex flex-col gap-4 shadow-3xs transition-colors ${
           theme === "dark" ? "bg-slate-900/60 border-white/5" : "bg-white border-slate-200/80 hover:border-gray-300"
@@ -187,7 +219,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-3.5xl font-black tracking-tight leading-none">
-              ₹{demoTotalSpent.toLocaleString("en-IN")}
+              ₹{totalSpent.toLocaleString("en-IN")}
             </h2>
             <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider mt-1">Aggregated across active pools</p>
           </div>
@@ -210,7 +242,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-3.5xl font-black tracking-tight text-red-600 dark:text-red-500 leading-none">
-              ₹{demoOwes.toLocaleString("en-IN")}
+              ₹{youOwe.toLocaleString("en-IN")}
             </h2>
             <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider mt-1">Total outstanding bills</p>
           </div>
@@ -233,7 +265,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-3.5xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 leading-none">
-              ₹{demoGets.toLocaleString("en-IN")}
+              ₹{youAreOwed.toLocaleString("en-IN")}
             </h2>
             <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider mt-1">Reimbursement suggestions</p>
           </div>
@@ -243,12 +275,12 @@ export const Dashboard: React.FC = () => {
 
       {groups.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* List of active groups (left part) */}
           <div className="lg:col-span-2 flex flex-col gap-6 text-left">
             <div className="flex justify-between items-center">
               <h3 className="font-sans font-black text-sm tracking-wider uppercase text-gray-400">Active Dispute Pools</h3>
-              <button 
+              <button
                 onClick={() => navigate("/groups")}
                 className="text-xs text-gray-400 hover:text-black dark:hover:text-cyan-400 font-semibold flex items-center gap-1 cursor-pointer font-mono"
               >
@@ -263,8 +295,8 @@ export const Dashboard: React.FC = () => {
                   key={group.id}
                   onClick={() => navigate("/groups/[id]", { id: group.id })}
                   className={`border rounded-xl p-5 transition-all cursor-pointer flex items-center justify-between group shadow-3xs ${
-                    theme === "dark" 
-                      ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/20" 
+                    theme === "dark"
+                      ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/20"
                       : "bg-white border-slate-150 hover:border-slate-300"
                   }`}
                 >
@@ -286,7 +318,7 @@ export const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-gray-400 group-hover:text-cyan-400 transition-all">[ OPEN ]</span>
                     <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
@@ -295,39 +327,43 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
 
-            {/* Static Analytics Preview */}
+            {/* Real category distribution */}
             <div className={`border rounded-2xl p-6 flex flex-col gap-5 mt-2 ${
               theme === "dark" ? "bg-slate-900/60 border-white/5" : "bg-white border-slate-200/80"
             }`}>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-mono tracking-widest text-gray-400 uppercase font-bold">Category Analytics</span>
-                <h4 className="text-sm font-bold truncate">Overall Trip Expenses Distribution</h4>
+                <h4 className="text-sm font-bold truncate">Overall Expense Distribution</h4>
               </div>
 
-              {/* Custom High polished visual bars */}
-              <div className="flex flex-col gap-4 mt-2">
-                {[
-                  { category: "Villa Stay & Rent", amount: 15000, pct: 52, color: theme === "dark" ? "bg-cyan-500" : "bg-black", faIcon: faHouse },
-                  { category: "Scuba & Adventure", amount: 6000, pct: 21, color: "bg-slate-500", faIcon: faTicket },
-                  { category: "Cafes & Dining Out", amount: 4500, pct: 16, color: "bg-neutral-450 bg-slate-700", faIcon: faUtensils },
-                  { category: "Transport & Thar Lease", amount: 3200, pct: 11, color: "bg-gray-400", faIcon: faGasPump }
-                ].map((item) => (
-                  <div key={item.category} className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold flex items-center gap-1.5">
-                        <FontAwesomeIcon icon={item.faIcon} className="text-[10px] text-gray-400 dark:text-cyan-400 shrink-0" />
-                        <span>{item.category}</span>
-                      </span>
-                      <span className="text-gray-400 font-mono font-bold">₹{item.amount.toLocaleString("en-IN")} ({item.pct}%)</span>
-                    </div>
-                    <div className={`w-full h-2 rounded-full overflow-hidden ${
-                      theme === "dark" ? "bg-slate-950 border border-white/5" : "bg-gray-50 border-gray-100"
-                    }`}>
-                      <div className={`h-full rounded-full ${item.color}`} style={{ width: `${item.pct}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {categoryList.length === 0 ? (
+                <p className="text-xs text-gray-400 font-mono py-4 text-center">
+                  No expenses logged yet. Add spends inside a group to see the breakdown here.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-4 mt-2">
+                  {categoryList.map((item, idx) => {
+                    const meta = catMeta(item.category);
+                    const pct = totalSpent > 0 ? Math.round((item.amount / totalSpent) * 100) : 0;
+                    return (
+                      <div key={item.category} className="flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <FontAwesomeIcon icon={meta.faIcon} className="text-[10px] text-gray-400 dark:text-cyan-400 shrink-0" />
+                            <span>{meta.label}</span>
+                          </span>
+                          <span className="text-gray-400 font-mono font-bold">₹{item.amount.toLocaleString("en-IN")} ({pct}%)</span>
+                        </div>
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${
+                          theme === "dark" ? "bg-slate-950 border border-white/5" : "bg-gray-50 border-gray-100"
+                        }`}>
+                          <div className={`h-full rounded-full ${BAR_COLORS[idx % BAR_COLORS.length]}`} style={{ width: `${pct}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -341,7 +377,7 @@ export const Dashboard: React.FC = () => {
             {/* Smart card style */}
             <div className="bg-slate-950 text-[#fafafa] border border-white/5 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10"></div>
-              
+
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
@@ -355,7 +391,7 @@ export const Dashboard: React.FC = () => {
               {loadingInsights ? (
                 <div className="flex flex-col gap-3 py-6 items-center justify-center text-center">
                   <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span className="text-xs text-[#9CA3AF] font-mono">Running neural trip audit...</span>
+                  <span className="text-xs text-[#9CA3AF] font-mono">Running neural spend audit...</span>
                 </div>
               ) : aiInsights.length > 0 ? (
                 <div className="flex flex-col gap-5">
@@ -379,14 +415,18 @@ export const Dashboard: React.FC = () => {
               ) : (
                 <div className="flex flex-col gap-3 text-center py-6">
                   <p className="text-xs text-[#9CA3AF] font-semibold leading-relaxed">
-                    "Total spend is fully under budget parameters. No suspicious chai spend patterns found so far."
+                    {spendExpenses.length === 0
+                      ? "Log some group expenses and the AI will audit your spending patterns here."
+                      : "No insights yet. Recalculate to run an audit on your logged spends."}
                   </p>
-                  <button 
-                    onClick={loadAInsights}
-                    className="text-[10px] text-cyan-400 underline hover:text-cyan-300 font-bold cursor-pointer font-mono"
-                  >
-                    [ RECALCULATE AUDIT FEED ]
-                  </button>
+                  {spendExpenses.length > 0 && (
+                    <button
+                      onClick={loadAInsights}
+                      className="text-[10px] text-cyan-400 underline hover:text-cyan-300 font-bold cursor-pointer font-mono"
+                    >
+                      [ RECALCULATE AUDIT FEED ]
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -397,7 +437,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Static UPI QR Prompt Banner */}
+            {/* UPI QR Prompt Banner */}
             <div className={`border rounded-xl p-5 flex flex-col gap-3 ${
               theme === "dark" ? "bg-emerald-500/5 border-emerald-500/10 text-white" : "bg-emerald-50/50 border-emerald-100"
             }`}>

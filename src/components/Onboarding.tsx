@@ -8,8 +8,7 @@ import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { collection, query, where, getDocs, doc, setDoc } from "firebase/firestore";
 import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
-import { seedSampleData } from "../utils/dummyHelper";
-import { 
+import {
   User, 
   Check, 
   Info, 
@@ -22,7 +21,8 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  LogOut
+  LogOut,
+  Banknote
 } from "lucide-react";
 import { logoutUser } from "../lib/firebase";
 
@@ -30,8 +30,11 @@ export const Onboarding: React.FC = () => {
   const { user, profile, updateFullProfile, theme, setTheme } = useApp();
   const [firstName, setFirstName] = useState("");
   const [surname, setSurname] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [upiId, setUpiId] = useState("");
+  const [paymentPref, setPaymentPref] = useState<"cash" | "upi">("upi");
   
   // Validation / check states
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -56,6 +59,15 @@ export const Onboarding: React.FC = () => {
       }
       if (profile.username) {
         setUsername(profile.username);
+      }
+      if (profile.nickname) {
+        setNickname(profile.nickname);
+      }
+      if (profile.phone) {
+        setPhone(profile.phone);
+      }
+      if (profile.paymentPreference) {
+        setPaymentPref(profile.paymentPreference);
       }
     }
   }, [profile]);
@@ -134,9 +146,17 @@ export const Onboarding: React.FC = () => {
     const lName = surname.trim();
     const uName = username.trim().toLowerCase();
     const vpa = upiId.trim();
+    const nick = nickname.trim();
+    const phoneVal = phone.trim();
 
     if (!fName || !lName) {
       setErrorMsg("Please enter both your First Name and Surname.");
+      return;
+    }
+
+    const phoneDigits = phoneVal.replace(/\D/g, "");
+    if (phoneDigits.length < 7) {
+      setErrorMsg("Please enter a valid phone number.");
       return;
     }
 
@@ -170,8 +190,11 @@ export const Onboarding: React.FC = () => {
         uid: user.uid,
         name: `${fName} ${lName}`,
         surname: lName,
+        nickname: nick || fName,
+        phone: phoneVal,
         username: uName,
         upiId: vpa,
+        paymentPreference: paymentPref,
         email: user.email || "",
         photoURL: user.photoURL || "",
         isOnboarded: true,
@@ -184,9 +207,9 @@ export const Onboarding: React.FC = () => {
 
       await dbSetDoc("users", user.uid, cleanedProfile);
 
-      // 4. Seed goa-trip dummy data automatically so they have high quality sandbox items
-      await seedSampleData(user.uid, `${fName} ${lName}`, user.email || "");
-
+      // New accounts start with a clean slate — no seeded/sample data.
+      // The profile snapshot listener flips isOnboarded → true and the app
+      // moves the user forward to their (empty) dashboard automatically.
     } catch (err: any) {
       console.error("Onboarding setup failure:", err);
       setErrorMsg(err?.message || "Server write failed. Please try saving again.");
@@ -307,6 +330,65 @@ export const Onboarding: React.FC = () => {
               </div>
             </div>
 
+            {/* Nickname — how the app will address you */}
+            <div>
+              <label className={`block text-[10px] font-mono tracking-widest uppercase mb-1.5 ${
+                theme === "dark" ? "text-slate-400" : "text-slate-600"
+              }`}>NICKNAME (WHAT WE'LL CALL YOU)</label>
+              <input
+                type="text"
+                maxLength={24}
+                placeholder="e.g. Parth — leave blank to use your first name"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className={`w-full text-xs py-3 px-4 rounded-xl border focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white"
+                    : "bg-slate-50 border-slate-200 focus:border-black text-slate-900"
+                }`}
+              />
+              <p className="text-[9px] text-gray-500 mt-1.5 font-mono">
+                This is the name the app greets and refers to you by. You can change it anytime from your Profile.
+              </p>
+            </div>
+
+            {/* Email (from sign-in) + Phone */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={`block text-[10px] font-mono tracking-widest uppercase mb-1.5 ${
+                  theme === "dark" ? "text-slate-400" : "text-slate-600"
+                }`}>EMAIL</label>
+                <input
+                  type="email"
+                  disabled
+                  value={user?.email || ""}
+                  className={`w-full text-xs py-3 px-4 rounded-xl border transition-all cursor-not-allowed opacity-70 ${
+                    theme === "dark"
+                      ? "bg-slate-950/40 border-white/10 text-slate-300"
+                      : "bg-slate-100 border-slate-200 text-slate-600"
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-mono tracking-widest uppercase mb-1.5 ${
+                  theme === "dark" ? "text-slate-400" : "text-slate-600"
+                }`}>PHONE NUMBER</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +91 98765 43210"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={`w-full text-xs py-3 px-4 rounded-xl border focus:outline-none transition-all ${
+                    theme === "dark"
+                      ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white"
+                      : "bg-slate-50 border-slate-200 focus:border-black text-slate-900"
+                  }`}
+                />
+              </div>
+            </div>
+
             {/* Unique Username Form Check */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
@@ -389,6 +471,38 @@ export const Onboarding: React.FC = () => {
               </div>
               <p className="text-[9px] text-gray-500 mt-1.5 font-mono">
                 Mandatory for peer-to-peer settlement transaction QR code renders.
+              </p>
+            </div>
+
+            {/* Preferred settlement method */}
+            <div>
+              <label className={`block text-[10px] font-mono tracking-widest uppercase mb-1.5 ${
+                theme === "dark" ? "text-slate-400" : "text-slate-600"
+              }`}>PREFERRED PAYMENT METHOD</label>
+              <div className={`grid grid-cols-2 gap-2 p-1 rounded-xl border ${
+                theme === "dark" ? "bg-slate-950/60 border-white/10" : "bg-slate-50 border-slate-200"
+              }`}>
+                {(["upi", "cash"] as const).map((opt) => {
+                  const active = paymentPref === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setPaymentPref(opt)}
+                      className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold uppercase font-mono tracking-wider transition-all cursor-pointer ${
+                        active
+                          ? theme === "dark" ? "bg-cyan-500 text-black" : "bg-black text-white"
+                          : theme === "dark" ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-black"
+                      }`}
+                    >
+                      {opt === "upi" ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
+                      {opt === "upi" ? "UPI" : "Cash"}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-gray-500 mt-1.5 font-mono">
+                How you'd prefer friends to settle up with you. You can change this anytime.
               </p>
             </div>
 

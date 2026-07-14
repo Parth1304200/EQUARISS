@@ -1,0 +1,22 @@
+# Netlify configuration for the Equaris web app.
+# Static client is built into dist/; the wallet assistant runs as a serverless
+# function (server.ts does not run on Netlify).
+
+[build]
+  command = "npx vite build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Wallet assistant → Ollama Cloud proxy (keeps the client calling /api/... unchanged).
+# MUST come before the SPA catch-all so it isn't swallowed by it.
+[[redirects]]
+  from = "/api/assistant/chat"
+  to = "/.netlify/functions/assistant-chat"
+  status = 200
+
+# SPA fallback so client routes (e.g. /network?connect=..., /groups/:id) resolve
+# instead of 404-ing on a direct load or refresh.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

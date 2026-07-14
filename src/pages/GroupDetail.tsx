@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
-import { dbSetDoc, dbAddDoc, dbDeleteDoc, dbUpdateDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbAddDoc, dbDeleteDoc, dbUpdateDoc, dbGetDoc } from "../lib/firestoreQuery";
 import { calculateBalances, generateSettlementSuggestions } from "../lib/settleEngine";
+import { SettleProofModal } from "../components/SettleProofModal";
 import QRCode from "qrcode";
 import { 
   Users, 
@@ -54,6 +55,7 @@ export const GroupDetail: React.FC = () => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedRepayment, setSelectedRepayment] = useState<any>(null);
   const [customUpiId, setCustomUpiId] = useState("");
+  const [proofFor, setProofFor] = useState<any>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // New expense form inline state
@@ -88,26 +90,27 @@ export const GroupDetail: React.FC = () => {
   const liveBalances = activeGroup ? calculateBalances(activeGroup.members, activeGroupExpenses) : {};
   const liveSuggestions = activeGroup ? generateSettlementSuggestions(activeGroup.id, liveBalances) : [];
 
-  // UPI url helper generator
-  const getUpiUrl = (recipientUid: string, amount: number) => {
-    const defaultUpi = "paytm@upi";
-    // Check if recipient is Parth or Rohan or user profile has a upiId
-    let upiId = defaultUpi;
-    if (recipientUid === "mock_parth_uid") upiId = "parth@paytm";
-    else if (recipientUid === "mock_rohan_uid") upiId = "rohan@okhdfc";
-    else if (recipientUid === user?.uid && profile?.upiId) upiId = profile.upiId;
-    
-    if (customUpiId) {
-      upiId = customUpiId;
+  // Resolve a recipient's real UPI id (own profile, or fetched from their user doc).
+  const resolveRecipientUpi = async (recipientUid: string): Promise<string> => {
+    if (recipientUid === user?.uid) return profile?.upiId || "";
+    try {
+      const snap = await dbGetDoc("users", recipientUid);
+      return (snap && snap.exists() && snap.data()?.upiId) || "";
+    } catch {
+      return "";
     }
+  };
 
+  // UPI url helper generator — uses the manually-entered/resolved recipient VPA.
+  const getUpiUrl = (recipientUid: string, amount: number) => {
+    const upiId = customUpiId.trim();
     const name = activeGroup?.memberNames[recipientUid] || "GroupRepay";
     return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Settle on Dispute - ${activeGroup?.name || ""}`)}`;
   };
 
-  // Draw QR code whenever pay modal is opened
+  // Draw QR code whenever pay modal is opened and a UPI id is available
   useEffect(() => {
-    if (showPayModal && selectedRepayment && canvasRef.current) {
+    if (showPayModal && selectedRepayment && customUpiId.trim() && canvasRef.current) {
       const recipientUid = selectedRepayment.toUid;
       const amount = selectedRepayment.amount;
       const url = getUpiUrl(recipientUid, amount);
@@ -130,61 +133,59 @@ export const GroupDetail: React.FC = () => {
     }
   }, [showPayModal, selectedRepayment, customUpiId]);
 
-  // Handle marking settlement as closed/settled
-  const handleMarkSettled = async (repay: any) => {
+  // Handle marking settlement as closed/settled (requires payment proof)
+  const handleMarkSettled = async (repay: any, proof: { transactionId: string; proofImage: string }) => {
     if (!user || !activeGroup) return;
 
-    try {
-      // 1. Add settlement object to subcollection
-      const setRefId = `set_${Date.now()}`;
-      await dbSetDoc(`groups/${activeGroup.id}/settlements`, setRefId, {
-        id: setRefId,
-        groupId: activeGroup.id,
-        fromUid: repay.fromUid,
-        toUid: repay.toUid,
-        amount: repay.amount,
-        status: "settled",
-        createdAt: new Date().toISOString(),
-        settledAt: new Date().toISOString()
-      });
+    // 1. Add settlement object to subcollection (with mandatory proof)
+    const setRefId = `set_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/settlements`, setRefId, {
+      id: setRefId,
+      groupId: activeGroup.id,
+      fromUid: repay.fromUid,
+      toUid: repay.toUid,
+      amount: repay.amount,
+      status: "settled",
+      createdAt: new Date().toISOString(),
+      settledAt: new Date().toISOString(),
+      transactionId: proof.transactionId,
+      proofImage: proof.proofImage
+    });
 
-      // 2. Log activity
-      const senderName = activeGroup.memberNames[repay.fromUid] || "Someone";
-      const receiverName = activeGroup.memberNames[repay.toUid] || "Someone";
-      const actId = `act_${Date.now()}`;
-      await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
-        id: actId,
-        groupId: activeGroup.id,
-        category: "settlement_marked",
-        message: `${senderName} settled ₹${repay.amount.toLocaleString("en-IN")} with ${receiverName}.`,
-        actorId: user.uid,
-        createdAt: new Date().toISOString()
-      });
+    // 2. Log activity
+    const senderName = activeGroup.memberNames[repay.fromUid] || "Someone";
+    const receiverName = activeGroup.memberNames[repay.toUid] || "Someone";
+    const actId = `act_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
+      id: actId,
+      groupId: activeGroup.id,
+      category: "settlement_marked",
+      message: `${senderName} settled ₹${repay.amount.toLocaleString("en-IN")} with ${receiverName}. (Ref: ${proof.transactionId})`,
+      actorId: user.uid,
+      createdAt: new Date().toISOString()
+    });
 
-      // 3. Subtract balances by dynamically adding a counter-balancing expense
-      // We can model a "Settlement transaction" as a special category "settlement" expense to offset
-      const expRefId = `exp_settle_${Date.now()}`;
-      await dbSetDoc(`groups/${activeGroup.id}/expenses`, expRefId, {
-        id: expRefId,
-        groupId: activeGroup.id,
-        title: `Settlement: ${senderName} ➜ ${receiverName}`,
-        amount: repay.amount,
-        paidBy: repay.fromUid,
-        category: "settlement",
-        date: new Date().toISOString().substring(0, 10),
-        splitType: "exact",
-        splits: [
-          { uid: repay.toUid, amount: repay.amount }
-        ],
-        createdAt: new Date().toISOString()
-      });
+    // 3. Subtract balances by dynamically adding a counter-balancing expense
+    // We can model a "Settlement transaction" as a special category "settlement" expense to offset
+    const expRefId = `exp_settle_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/expenses`, expRefId, {
+      id: expRefId,
+      groupId: activeGroup.id,
+      title: `Settlement: ${senderName} ➜ ${receiverName}`,
+      amount: repay.amount,
+      paidBy: repay.fromUid,
+      category: "settlement",
+      date: new Date().toISOString().substring(0, 10),
+      splitType: "exact",
+      splits: [
+        { uid: repay.toUid, amount: repay.amount }
+      ],
+      createdAt: new Date().toISOString()
+    });
 
-      setShowPayModal(false);
-      setSelectedRepayment(null);
-      refetchActiveGroupData();
-    } catch (err) {
-      console.error("Failed to mark settled in Firestore:", err);
-    }
+    setShowPayModal(false);
+    setSelectedRepayment(null);
+    refetchActiveGroupData();
   };
 
   // Submit standard / manual expense creation
@@ -697,9 +698,10 @@ export const GroupDetail: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           id={`pay-modal-trigger-${idx}`}
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedRepayment(repay);
                             setShowPayModal(true);
+                            setCustomUpiId(await resolveRecipientUpi(repay.toUid));
                           }}
                           className="text-[11px] font-bold py-1.5 px-3 bg-white border border-gray-200.90 hover:border-black text-gray-800 rounded-lg cursor-pointer flex items-center gap-1 transition-colors"
                         >
@@ -709,7 +711,7 @@ export const GroupDetail: React.FC = () => {
 
                         <button
                           id={`settle-direct-${idx}`}
-                          onClick={() => handleMarkSettled(repay)}
+                          onClick={() => setProofFor(repay)}
                           className="text-[11px] font-semibold py-1.5 px-3 bg-black hover:bg-gray-800 text-white rounded-lg cursor-pointer transition-colors"
                         >
                           Mark Settled
@@ -858,21 +860,30 @@ export const GroupDetail: React.FC = () => {
               </h2>
             </div>
 
-            {/* The dynamic Canvas QR drawer */}
-            <div className="p-3.5 bg-[#fafafa] border border-gray-150 rounded-xl max-w-[240px] max-h-[240px]">
-              <canvas ref={canvasRef} className="rounded-lg shadow-3xs"></canvas>
-            </div>
-
-            <p className="text-[10px] text-gray-400 leading-normal text-center max-w-[250px]">
-              Scan with GPay, PhonePe, Paytm, or any banking app. Once completed, tap below to balance the accounting ledger.
-            </p>
+            {/* The dynamic Canvas QR drawer — shown only when a UPI id is set */}
+            {customUpiId.trim() ? (
+              <>
+                <div className="p-3.5 bg-[#fafafa] border border-gray-150 rounded-xl max-w-[240px] max-h-[240px]">
+                  <canvas ref={canvasRef} className="rounded-lg shadow-3xs"></canvas>
+                </div>
+                <p className="text-[10px] text-gray-400 leading-normal text-center max-w-[250px]">
+                  Scan with GPay, PhonePe, Paytm, or any banking app. Once completed, tap below to balance the accounting ledger.
+                </p>
+              </>
+            ) : (
+              <div className="w-full p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                  {activeGroup.memberNames[selectedRepayment.toUid]} hasn't set a UPI ID. Enter one below to generate a payment QR, or just mark the settlement as paid.
+                </p>
+              </div>
+            )}
 
             {/* Customize UPI VPA fields */}
             <div className="w-full flex flex-col gap-1">
-              <label className="text-[10px] font-mono text-gray-550">Change Recipient UPI Id (debug/demo):</label>
+              <label className="text-[10px] font-mono text-gray-550">Recipient UPI Id:</label>
               <input
                 type="text"
-                placeholder={selectedRepayment.toUid === "mock_parth_uid" ? "parth@paytm" : "friend@upi"}
+                placeholder="friend@upi"
                 value={customUpiId}
                 onChange={(e) => setCustomUpiId(e.target.value)}
                 className="w-full text-xs py-1.5 px-2 border border-gray-200 focus:border-black outline-hidden rounded-md font-mono"
@@ -882,17 +893,22 @@ export const GroupDetail: React.FC = () => {
             <div className="w-full grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
+                disabled={!customUpiId.trim()}
                 onClick={() => {
                   const url = getUpiUrl(selectedRepayment.toUid, selectedRepayment.amount);
                   window.location.href = url;
                 }}
-                className="py-2.5 bg-white border border-gray-200.90 hover:border-black text-gray-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="py-2.5 bg-white border border-gray-200.90 hover:border-black text-gray-800 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Launch UPI app
               </button>
               <button
                 type="button"
-                onClick={() => handleMarkSettled(selectedRepayment)}
+                onClick={() => {
+                  const target = selectedRepayment;
+                  setShowPayModal(false);
+                  setProofFor(target);
+                }}
                 className="py-2.5 bg-black hover:bg-gray-850 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 Mark as Settled
@@ -902,6 +918,25 @@ export const GroupDetail: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Mandatory payment-proof capture before a settlement is recorded */}
+      <SettleProofModal
+        repay={
+          proofFor && activeGroup
+            ? {
+                fromName: activeGroup.memberNames[proofFor.fromUid] || "Member",
+                toName: activeGroup.memberNames[proofFor.toUid] || "Member",
+                amount: proofFor.amount,
+                groupName: activeGroup.name
+              }
+            : null
+        }
+        onClose={() => setProofFor(null)}
+        onConfirm={async (proof) => {
+          await handleMarkSettled(proofFor, proof);
+          setProofFor(null);
+        }}
+      />
 
     </div>
   );

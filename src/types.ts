@@ -8,9 +8,14 @@ export interface UserProfile {
   name: string;
   surname?: string;
   username?: string;
+  /** Friendly name the app uses to address & refer to the user. */
+  nickname?: string;
   email: string;
+  phone?: string;
   photoURL?: string;
   upiId?: string;
+  /** How the user prefers to settle up: receive/pay in cash or via UPI. */
+  paymentPreference?: "cash" | "upi";
   isOnboarded?: boolean;
   friends?: string[]; // accepted connected user uids
   sentRequests?: string[]; // pending outbound usernames or uids
@@ -50,6 +55,10 @@ export interface Settlement {
   status: "pending" | "settled";
   createdAt: string;
   settledAt?: string;
+  /** UPI/bank reference number the payer pastes in as proof. */
+  transactionId?: string;
+  /** Compressed base64 data URL of the payment-confirmation screenshot. */
+  proofImage?: string;
 }
 
 export interface Activity {

@@ -6,62 +6,103 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import { calculateBalances, generateSettlementSuggestions } from "../lib/settleEngine";
-import { dbSetDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
+import { SettleProofModal } from "../components/SettleProofModal";
 import QRCode from "qrcode";
-import { ArrowRight, QrCode, CheckCircle, Gift, X, CheckSquare, Sparkles } from "lucide-react";
+import { ArrowRight, QrCode, Gift, X } from "lucide-react";
+
+interface Repayment {
+  groupId: string;
+  groupName: string;
+  fromUid: string;
+  toUid: string;
+  amount: number;
+  fromName: string;
+  toName: string;
+  toUpi: string;
+}
 
 export const Settlements: React.FC = () => {
-  const { user, profile, groups, refetchActiveGroupData } = useApp();
-  
-  // Consolidated suggested settlements across all loops
-  const [allRepayments, setAllRepayments] = useState<any[]>([]);
+  const { user, profile, groups, allExpenses, refetchActiveGroupData } = useApp();
+
+  // Consolidated suggested settlements, computed from real balances per group.
+  const [allRepayments, setAllRepayments] = useState<Repayment[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [activeRepay, setActiveRepay] = useState<any>(null);
+  const [activeRepay, setActiveRepay] = useState<Repayment | null>(null);
+  const [proofFor, setProofFor] = useState<Repayment | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (groups.length === 0) return;
+    if (!user || groups.length === 0) {
+      setAllRepayments([]);
+      return;
+    }
 
-    let list: any[] = [];
-    groups.forEach((g) => {
-      // We can fetch or simply consolidate
-      // Since context handles listeners, we can evaluate on-screen
-      // In first load/seed context, let's look at goa trip
-      if (g.id === "goa_trip_2026") {
-        // Compute goa trip suggs
-        const balances = {
-          "mock_parth_uid": 5433,
-          "mock_rohan_uid": -6366,
-          [user?.uid || ""]: 933
-        };
-        const suggs = generateSettlementSuggestions(g.id, balances);
-        suggs.forEach((s) => {
-          list.push({
+    let cancelled = false;
+
+    const build = async () => {
+      const raw: Omit<Repayment, "toUpi">[] = [];
+
+      groups.forEach((g) => {
+        const groupExpenses = allExpenses.filter((e) => e.groupId === g.id);
+        if (groupExpenses.length === 0) return;
+
+        const balances = calculateBalances(g.members, groupExpenses);
+        const suggestions = generateSettlementSuggestions(g.id, balances);
+
+        suggestions.forEach((s) => {
+          const nameFor = (uid: string) =>
+            uid === user.uid ? "You" : g.memberNames?.[uid] || "Member";
+          raw.push({
+            groupId: g.id,
             groupName: g.name,
-            ...s
+            fromUid: s.fromUid,
+            toUid: s.toUid,
+            amount: s.amount,
+            fromName: nameFor(s.fromUid),
+            toName: nameFor(s.toUid)
           });
         });
-      } else {
-        // Construct standard placeholders or computed metrics dynamically based on that active group profile
+      });
+
+      // Resolve each recipient's real UPI id (cached per uid).
+      const upiCache: Record<string, string> = {};
+      const resolveUpi = async (uid: string): Promise<string> => {
+        if (uid in upiCache) return upiCache[uid];
+        if (uid === user.uid) {
+          upiCache[uid] = profile?.upiId || "";
+        } else {
+          try {
+            const snap = await dbGetDoc("users", uid);
+            upiCache[uid] = (snap && snap.exists() && snap.data()?.upiId) || "";
+          } catch {
+            upiCache[uid] = "";
+          }
+        }
+        return upiCache[uid];
+      };
+
+      const withUpi: Repayment[] = [];
+      for (const r of raw) {
+        withUpi.push({ ...r, toUpi: await resolveUpi(r.toUid) });
       }
-    });
 
-    setAllRepayments(list);
-  }, [groups, user]);
+      if (!cancelled) setAllRepayments(withUpi);
+    };
 
-  // UPI url helper generator
-  const getUpiUrl = (recipientUid: string, amount: number) => {
-    let upiId = "paytm@upi";
-    if (recipientUid === "mock_parth_uid") upiId = "parth@paytm";
-    else if (recipientUid === "mock_rohan_uid") upiId = "rohan@okhdfc";
-    else if (recipientUid === user?.uid && profile?.upiId) upiId = profile.upiId;
+    build();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profile, groups, allExpenses]);
 
-    return `upi://pay?pa=${upiId}&pn=${encodeURIComponent("Friend")}&am=${amount}&cu=INR&tn=DisputeSettle`;
-  };
+  // UPI url helper generator (real recipient VPA required).
+  const getUpiUrl = (upiId: string, amount: number, payeeName: string) =>
+    `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=DisputeSettle`;
 
   useEffect(() => {
-    if (showQrModal && activeRepay && canvasRef.current) {
-      const url = getUpiUrl(activeRepay.toUid, activeRepay.amount);
+    if (showQrModal && activeRepay && activeRepay.toUpi && canvasRef.current) {
+      const url = getUpiUrl(activeRepay.toUpi, activeRepay.amount, activeRepay.toName);
       QRCode.toCanvas(
         canvasRef.current,
         url,
@@ -76,46 +117,41 @@ export const Settlements: React.FC = () => {
     }
   }, [showQrModal, activeRepay]);
 
-  const handleSettle = async (repay: any) => {
+  const handleSettle = async (repay: Repayment, proof: { transactionId: string; proofImage: string }) => {
     if (!user || !groups) return;
 
-    try {
-      // Model settlement action
-      const setRefId = `set_con_${Date.now()}`;
-      await dbSetDoc(`groups/${repay.groupId}/settlements`, setRefId, {
-        id: setRefId,
-        groupId: repay.groupId,
-        fromUid: repay.fromUid,
-        toUid: repay.toUid,
-        amount: repay.amount,
-        status: "settled",
-        createdAt: new Date().toISOString(),
-        settledAt: new Date().toISOString()
-      });
+    // Model settlement action (with mandatory payment proof)
+    const setRefId = `set_con_${Date.now()}`;
+    await dbSetDoc(`groups/${repay.groupId}/settlements`, setRefId, {
+      id: setRefId,
+      groupId: repay.groupId,
+      fromUid: repay.fromUid,
+      toUid: repay.toUid,
+      amount: repay.amount,
+      status: "settled",
+      createdAt: new Date().toISOString(),
+      settledAt: new Date().toISOString(),
+      transactionId: proof.transactionId,
+      proofImage: proof.proofImage
+    });
 
-      // Offset transaction in ledger
-      const expRefId = `exp_set_${Date.now()}`;
-      await dbSetDoc(`groups/${repay.groupId}/expenses`, expRefId, {
-        id: expRefId,
-        groupId: repay.groupId,
-        title: `Settlement: Settle Repay`,
-        amount: repay.amount,
-        paidBy: repay.fromUid,
-        category: "settlement",
-        date: new Date().toISOString().substring(0, 10),
-        splitType: "exact",
-        splits: [{ uid: repay.toUid, amount: repay.amount }],
-        createdAt: new Date().toISOString()
-      });
+    // Offset transaction in ledger
+    const expRefId = `exp_set_${Date.now()}`;
+    await dbSetDoc(`groups/${repay.groupId}/expenses`, expRefId, {
+      id: expRefId,
+      groupId: repay.groupId,
+      title: `Settlement: ${repay.fromName} ➜ ${repay.toName}`,
+      amount: repay.amount,
+      paidBy: repay.fromUid,
+      category: "settlement",
+      date: new Date().toISOString().substring(0, 10),
+      splitType: "exact",
+      splits: [{ uid: repay.toUid, amount: repay.amount }],
+      createdAt: new Date().toISOString()
+    });
 
-      setShowQrModal(false);
-      setActiveRepay(null);
-      
-      // Dynamic refresh triggers
-      refetchActiveGroupData();
-    } catch (err) {
-      console.error(err);
-    }
+    // Dynamic refresh triggers
+    refetchActiveGroupData();
   };
 
   return (
@@ -134,14 +170,8 @@ export const Settlements: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {allRepayments.map((repay, index) => {
             const isMyDebt = repay.fromUid === user?.uid;
-            
-            // Name mappings
-            let fromName = "Rohan Khanna";
-            let toName = "Parth Tyagi";
-            if (repay.groupId === "goa_trip_2026") {
-              if (repay.fromUid === user?.uid) fromName = "Me (You)";
-              if (repay.toUid === user?.uid) toName = "Me (You)";
-            }
+            const fromName = repay.fromName;
+            const toName = repay.toName;
 
             return (
               <div
@@ -196,7 +226,7 @@ export const Settlements: React.FC = () => {
                     
                     <button
                       id={`consolidate-mark-settled-${index}`}
-                      onClick={() => handleSettle(repay)}
+                      onClick={() => setProofFor(repay)}
                       className="text-xs font-semibold py-1.5 px-3.5 bg-black hover:bg-gray-800 text-white rounded-lg cursor-pointer transition-colors"
                     >
                       Mark Settle
@@ -212,7 +242,7 @@ export const Settlements: React.FC = () => {
         <div className="bg-white border-2 border-dashed border-gray-150 rounded-2xl p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-3">
           <Gift className="w-10 h-10 text-gray-300" />
           <h3 className="font-bold text-gray-800 text-sm">Perfect Balance!</h3>
-          <p className="text-xs max-w-sm">No outstanding settlements mapped. Once you seed sample Goa data or log group spends, paybacks will surface here!</p>
+          <p className="text-xs max-w-sm">No outstanding settlements right now. Once you log group expenses that aren't split evenly, suggested paybacks will surface here automatically.</p>
         </div>
       )}
 
@@ -236,23 +266,37 @@ export const Settlements: React.FC = () => {
             </div>
 
             <div className="text-center flex flex-col gap-1.5">
-              <span className="text-[10px] font-mono tracking-widest text-[#9CA3AF] uppercase">Repay instant GPay / Paytm</span>
+              <span className="text-[10px] font-mono tracking-widest text-[#9CA3AF] uppercase">Repay {activeRepay.toName} · GPay / Paytm</span>
               <h2 className="text-2xl font-black text-gray-900 font-mono leading-none">
-                ₹{activeRepay.amount}
+                ₹{activeRepay.amount.toLocaleString("en-IN")}
               </h2>
             </div>
 
-            <div className="p-3.5 bg-[#fafafa] border border-gray-150 rounded-xl">
-              <canvas ref={canvasRef} className="rounded-lg"></canvas>
-            </div>
-
-            <p className="text-[10px] text-gray-400 text-center max-w-[250px]">
-              Complete the payment on your mobile UPI client and tap below to finalize the transaction.
-            </p>
+            {activeRepay.toUpi ? (
+              <>
+                <div className="p-3.5 bg-[#fafafa] border border-gray-150 rounded-xl">
+                  <canvas ref={canvasRef} className="rounded-lg"></canvas>
+                </div>
+                <p className="text-[10px] text-gray-400 text-center max-w-[250px]">
+                  Paying <span className="font-mono text-gray-600">{activeRepay.toUpi}</span>. Complete the payment on your mobile UPI client and tap below to finalize the transaction.
+                </p>
+              </>
+            ) : (
+              <div className="w-full p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                  {activeRepay.toName} hasn't set a UPI ID yet, so a payment QR can't be generated. You can still mark this settlement as paid once you've squared up another way.
+                </p>
+              </div>
+            )}
 
             <button
               id="confirm-settlement-btn"
-              onClick={() => handleSettle(activeRepay)}
+              onClick={() => {
+                const target = activeRepay;
+                setShowQrModal(false);
+                setActiveRepay(null);
+                setProofFor(target);
+              }}
               className="w-full py-2.5 bg-black hover:bg-gray-800 text-white font-semibold text-xs rounded-xl cursor-pointer"
             >
               Verify & Complete Settle
@@ -261,6 +305,21 @@ export const Settlements: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Mandatory payment-proof capture before a settlement is recorded */}
+      <SettleProofModal
+        repay={
+          proofFor
+            ? { fromName: proofFor.fromName, toName: proofFor.toName, amount: proofFor.amount, groupName: proofFor.groupName }
+            : null
+        }
+        onClose={() => setProofFor(null)}
+        onConfirm={async (proof) => {
+          if (!proofFor) return;
+          await handleSettle(proofFor, proof);
+          setProofFor(null);
+        }}
+      />
 
     </div>
   );

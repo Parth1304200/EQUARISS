@@ -39,9 +39,52 @@ service cloud.firestore {
       allow get: if isVerifiedUser() && isValidId(userId);
       allow list: if isVerifiedUser();
       allow create: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
-      allow update: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) &&
-                    incoming().uid == existing().uid &&
-                    incoming().email == existing().email;
+      // Two legal ways to update a user document:
+      //  (a) The owner editing their own profile (identity fields locked).
+      //  (b) ANOTHER signed-in user mutating ONLY the connection arrays, and only
+      //      to insert/remove their OWN uid — this is what powers friend requests,
+      //      accepts, declines and QR connect without exposing any other field.
+      allow update: if isVerifiedUser() && isValidId(userId) && (
+                      ( userId == request.auth.uid && isValidUser(incoming()) &&
+                        incoming().uid == existing().uid &&
+                        incoming().email == existing().email )
+                      ||
+                      ( userId != request.auth.uid && isSelfConnectionMutation() )
+                    );
+      allow delete: if false;
+    }
+
+    // A foreign user may only touch the three connection arrays, and each array
+    // may only change by inserting or removing THEIR OWN uid. Every other field
+    // (name, email, upiId, …) is guaranteed untouched by the hasOnly() gate.
+    function isSelfConnectionMutation() {
+      return incoming().diff(existing()).affectedKeys()
+               .hasOnly(['friends', 'sentRequests', 'receivedRequests']) &&
+             selfAddOrRemove('friends') &&
+             selfAddOrRemove('sentRequests') &&
+             selfAddOrRemove('receivedRequests');
+    }
+
+    // True when array `field` is unchanged, or the only difference is that the
+    // caller's own uid was added or removed (no tampering with other entries).
+    function selfAddOrRemove(field) {
+      let me = request.auth.uid;
+      let o = existing().get(field, []);
+      let n = incoming().get(field, []);
+      return n == o
+        || ( !o.hasAny([me]) && n.hasAll(o) && n.hasAny([me]) && n.size() == o.size() + 1 )
+        || ( o.hasAny([me]) && o.hasAll(n) && !n.hasAny([me]) && n.size() == o.size() - 1 );
+    }
+
+    // 1b. Usernames index — unique handle reservation created during onboarding.
+    match /usernames/{username} {
+      allow get: if isVerifiedUser();
+      allow list: if isVerifiedUser();
+      // Anyone signed in can claim a free handle that points at themselves.
+      allow create: if isVerifiedUser() && isValidId(username) && incoming().uid == request.auth.uid;
+      // Only the owner of an existing handle can rewrite it (prevents hijacking).
+      allow update: if isVerifiedUser() && isValidId(username) &&
+                    existing().uid == request.auth.uid && incoming().uid == request.auth.uid;
       allow delete: if false;
     }
 

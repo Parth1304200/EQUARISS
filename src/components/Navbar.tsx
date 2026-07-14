@@ -31,13 +31,22 @@ import {
   faGear,
   faBolt,
   faHandshake,
-  faSmile
+  faSmile,
+  faUser
 } from "@fortawesome/free-solid-svg-icons";
 
 export const Navbar: React.FC = () => {
-  const { profile, currentRoute, navigate, theme, setTheme } = useApp();
+  const { user, profile, currentRoute, navigate, theme, setTheme } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Show account + logout as soon as the user is authenticated, even if the
+  // Firestore profile document hasn't loaded yet. Fall back to the Firebase
+  // auth user's own fields so logout is never hidden behind a missing profile.
+  const displayName = profile?.nickname || profile?.name || user?.displayName || "Dispute User";
+  const displayEmail = profile?.email || user?.email || "";
+  const displayPhoto = profile?.photoURL || user?.photoURL || "";
+  const avatarInitial = (displayName || "D").charAt(0).toUpperCase();
 
   // Link layout items with Font Awesome Icons
   const links = [
@@ -46,6 +55,7 @@ export const Navbar: React.FC = () => {
     { label: "Network", path: "/network", icon: Users, faIcon: faGlobe },
     { label: "Settlements", path: "/settlements", icon: CreditCard, faIcon: faMoneyBillWave },
     { label: "Reports", path: "/reports", icon: PieChart, faIcon: faChartPie },
+    { label: "Profile", path: "/profile", icon: User, faIcon: faUser },
     { label: "Settings", path: "/settings", icon: SettingsIcon, faIcon: faGear },
   ];
 
@@ -151,13 +161,17 @@ export const Navbar: React.FC = () => {
         <div className={`border-t pt-4 flex items-center justify-between ${
           theme === "dark" ? "border-white/5" : "border-gray-100"
         }`}>
-          {profile ? (
+          {user ? (
             <div className="flex items-center justify-between w-full">
-              <div className="flex items-center space-x-3 overflow-hidden">
-                {profile.photoURL ? (
+              <div
+                onClick={() => navigate("/profile")}
+                title="View your profile"
+                className="flex items-center space-x-3 overflow-hidden cursor-pointer group/profile rounded-lg -m-1 p-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                {displayPhoto ? (
                   <img
-                    src={profile.photoURL}
-                    alt={profile.name}
+                    src={displayPhoto}
+                    alt={displayName}
                     referrerPolicy="no-referrer"
                     className="w-10 h-10 rounded-full border border-gray-150 shrink-0"
                   />
@@ -165,17 +179,17 @@ export const Navbar: React.FC = () => {
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border uppercase font-black text-xs ${
                     theme === "dark" ? "bg-slate-800 border-white/5 text-white" : "bg-gray-100 border-gray-250 text-slate-800"
                   }`}>
-                    {profile.name[0]}
+                    {avatarInitial}
                   </div>
                 )}
                 <div className="flex flex-col overflow-hidden">
                   <span className={`text-xs font-black truncate leading-none mb-1 ${
                     theme === "dark" ? "text-white" : "text-slate-800"
                   }`}>
-                    {profile.name}
+                    {displayName}
                   </span>
                   <span className="text-[10px] text-gray-400 font-mono truncate leading-none">
-                    {profile.email}
+                    {displayEmail}
                   </span>
                 </div>
               </div>
@@ -231,13 +245,13 @@ export const Navbar: React.FC = () => {
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {profile && (
+          {user && (
             <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 shrink-0">
-              {profile.photoURL ? (
-                <img src={profile.photoURL} alt={profile.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              {displayPhoto ? (
+                <img src={displayPhoto} alt={displayName} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gray-150 text-slate-800 flex items-center justify-center text-xs font-black uppercase">
-                  {profile.name[0]}
+                  {avatarInitial}
                 </div>
               )}
             </div>
@@ -265,10 +279,10 @@ export const Navbar: React.FC = () => {
             {renderNavLinks(true)}
           </nav>
           
-          {profile && (
+          {user && (
             <div className={`border-t pt-4 flex items-center justify-between ${theme === "dark" ? "border-white/5" : "border-gray-100"}`}>
               <span className="text-xs text-slate-400 font-mono truncate max-w-[180px]">
-                UPI: {profile.upiId || "No UPI set"}
+                UPI: {profile?.upiId || "No UPI set"}
               </span>
               <button
                 onClick={() => {

@@ -5,16 +5,10 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, where, documentId, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { Group, Expense, Settlement, Activity, UserProfile } from "../types";
-import { 
-  dbSetDoc, 
-  dbGetDoc, 
-  subscribeToMockStore, 
-  isMockMode, 
-  getLocalCollection 
-} from "../lib/firestoreQuery";
+import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
 
 interface RouteConfig {
   path: string;
@@ -29,6 +23,8 @@ interface AppContextType {
   navigate: (path: string, params?: Record<string, any>) => void;
   groups: Group[];
   setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+  /** Real expenses aggregated across every group the user belongs to. */
+  allExpenses: Expense[];
   activeGroupId: string | null;
   setActiveGroupId: (id: string | null) => void;
   activeGroup: Group | null;
@@ -45,13 +41,41 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+/**
+ * Map the browser's current URL to an in-app route on first load, and stash any
+ * `?connect=<handle>` QR deep-link so it survives login/onboarding.
+ */
+const deriveInitialRoute = (): RouteConfig => {
+  if (typeof window === "undefined") return { path: "/dashboard" };
+  const path = window.location.pathname;
+  const params = new URLSearchParams(window.location.search);
+  const connect = params.get("connect");
+  if (connect) {
+    try {
+      localStorage.setItem("dispute_pending_connect", connect);
+    } catch {
+      /* storage unavailable — deep link still works while on this page */
+    }
+    return { path: "/network" };
+  }
+  if (path.startsWith("/groups/")) {
+    return { path: "/groups/[id]", params: { id: path.split("/")[2] } };
+  }
+  const known = ["/dashboard", "/groups", "/settlements", "/network", "/reports", "/profile", "/settings"];
+  return known.includes(path) ? { path } : { path: "/dashboard" };
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [currentRoute, setCurrentRoute] = useState<RouteConfig>({ path: "/dashboard" });
+  const initialRoute = deriveInitialRoute();
+  const [currentRoute, setCurrentRoute] = useState<RouteConfig>(initialRoute);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(
+    initialRoute.path === "/groups/[id]" ? initialRoute.params?.id ?? null : null
+  );
   
   const [activeGroup, setActiveGroup] = useState<Group | null>(null);
   const [activeGroupExpenses, setActiveGroupExpenses] = useState<Expense[]>([]);
@@ -127,87 +151,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Auth state listener (supports both Firebase and Mock)
+  // Real Firebase auth state listener
   useEffect(() => {
-    if (isMockMode()) {
-      const storedUser = localStorage.getItem("dispute_mock_user");
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        
-        const syncProfile = () => {
-          const allUsers = getLocalCollection("users");
-          const foundProfile = allUsers.find((u) => u.uid === parsedUser.uid);
-          if (foundProfile) {
-            setProfile(foundProfile);
-            if (foundProfile.themePreference) {
-              setTheme(foundProfile.themePreference);
-            }
-          } else {
-            const placeholder: UserProfile = {
-              uid: parsedUser.uid,
-              name: parsedUser.displayName || "Mock Guest",
-              email: parsedUser.email || "mock@dispute.app",
-              photoURL: parsedUser.photoURL || "",
-              upiId: "myupi@paytm",
-              isOnboarded: false,
-              createdAt: new Date().toISOString()
-            };
-            const list = getLocalCollection("users");
-            list.push(placeholder);
-            localStorage.setItem("mock_db_users", JSON.stringify(list));
-            setProfile(placeholder);
-          }
-        };
-
-        syncProfile();
-        const unsubMock = subscribeToMockStore(syncProfile);
-
-        if (currentRoute.path === "/login") {
-          setCurrentRoute({ path: "/dashboard" });
-        }
-
-        setIsLoadingAuth(false);
-        return () => unsubMock();
-      } else {
-        setUser(null);
-        setProfile(null);
-        setCurrentRoute({ path: "/login" });
-        setIsLoadingAuth(false);
-      }
-      return;
-    }
-
     let unsubProfile: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
       if (currentUser) {
         if (unsubProfile) unsubProfile();
-        
-        // Listen to User Profile node dynamically in real-time
-        unsubProfile = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            setProfile(data);
-            if (data.themePreference) {
-              setTheme(data.themePreference);
+
+        // Listen to User Profile node in real-time
+        unsubProfile = onSnapshot(
+          doc(db, "users", currentUser.uid),
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data() as UserProfile;
+              setProfile(data);
+              if (data.themePreference) {
+                setTheme(data.themePreference);
+              }
+            } else {
+              // Brand-new account: create an empty profile with isOnboarded = false
+              // so Onboarding is triggered. NO fake/seeded data.
+              const placeholder: UserProfile = {
+                uid: currentUser.uid,
+                // Name must be non-empty to satisfy Firestore validation rules.
+                name:
+                  currentUser.displayName ||
+                  currentUser.email?.split("@")[0] ||
+                  "New User",
+                email: currentUser.email || "",
+                photoURL: currentUser.photoURL || "",
+                upiId: "",
+                isOnboarded: false,
+                createdAt: new Date().toISOString(),
+              };
+              dbSetDoc("users", currentUser.uid, placeholder)
+                .then(() => setProfile(placeholder))
+                .catch((err) =>
+                  console.error(
+                    "Failed to create initial user profile (check Firestore security rules for 'users'):",
+                    err
+                  )
+                );
             }
-          } else {
-            // First time initializer placeholder for auth synced profiles
-            const placeholder: UserProfile = {
-              uid: currentUser.uid,
-              name: currentUser.displayName || "",
-              email: currentUser.email || "",
-              photoURL: currentUser.photoURL || "",
-              upiId: "",
-              isOnboarded: false,
-              createdAt: new Date().toISOString()
-            };
-            dbSetDoc("users", currentUser.uid, placeholder).then(() => {
-              setProfile(placeholder);
-            });
+          },
+          (err) => {
+            // Without this handler the profile snapshot fails silently, leaving
+            // `profile` null forever — which strands the user on a half-loaded
+            // dashboard. Surface it so the rules/permissions issue is visible.
+            console.error(
+              "User profile snapshot failed (likely Firestore security rules denying read on 'users'):",
+              err
+            );
           }
-        });
+        );
 
         if (currentRoute.path === "/login") {
           setCurrentRoute({ path: "/dashboard" });
@@ -220,6 +219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProfile(null);
         setCurrentRoute({ path: "/login" });
       }
+
       setIsLoadingAuth(false);
     });
 
@@ -229,21 +229,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [currentRoute.path]);
 
+  // After sign-in + onboarding, honour a pending QR connect deep-link by routing
+  // the user to the network page (where the connection is confirmed & written).
+  useEffect(() => {
+    if (!user || !profile || profile.isOnboarded === false) return;
+    let pending: string | null = null;
+    try {
+      pending = localStorage.getItem("dispute_pending_connect");
+    } catch {
+      pending = null;
+    }
+    if (pending && currentRoute.path !== "/network") {
+      navigate("/network");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, profile?.isOnboarded]);
+
   // Listen to GROUPS list for authenticated user
   useEffect(() => {
     if (!user) {
       setGroups([]);
       return;
-    }
-
-    if (isMockMode()) {
-      const syncGroups = () => {
-        const allGroups = getLocalCollection("groups") as Group[];
-        const myGroups = allGroups.filter((g) => g.members.includes(user.uid));
-        setGroups(myGroups);
-      };
-      syncGroups();
-      return subscribeToMockStore(syncGroups);
     }
 
     const q = query(collection(db, "groups"), where("members", "array-contains", user.uid));
@@ -264,6 +270,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, [user]);
 
+  // Aggregate expenses across ALL of the user's groups so global views
+  // (Dashboard, Reports, Settlements) render from real data instead of mocks.
+  const groupIdsKey = groups.map((g) => g.id).sort().join(",");
+  useEffect(() => {
+    if (!user || groups.length === 0) {
+      setAllExpenses([]);
+      return;
+    }
+
+    const byGroup: Record<string, Expense[]> = {};
+    const unsubs = groups.map((g) =>
+      onSnapshot(
+        collection(db, `groups/${g.id}/expenses`),
+        (snapshot) => {
+          const list: Expense[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Expense);
+          });
+          byGroup[g.id] = list;
+          setAllExpenses(Object.values(byGroup).flat());
+        },
+        (error) => console.error("Aggregate expenses listener error:", error)
+      )
+    );
+
+    return () => unsubs.forEach((u) => u());
+    // groupIdsKey changes only when the SET of groups changes, avoiding churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, groupIdsKey]);
+
   // Subscribe to details of SELECTED ACTIVE GROUP
   useEffect(() => {
     if (!user || !activeGroupId) {
@@ -272,27 +308,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveGroupSettlements([]);
       setActiveGroupActivities([]);
       return;
-    }
-
-    if (isMockMode()) {
-      const syncActiveGroup = () => {
-        const allGroups = getLocalCollection("groups") as Group[];
-        const ag = allGroups.find((g) => g.id === activeGroupId) || null;
-        setActiveGroup(ag);
-
-        const exp = getLocalCollection(`groups/${activeGroupId}/expenses`) as Expense[];
-        exp.sort((a, b) => b.date.localeCompare(a.date));
-        setActiveGroupExpenses(exp);
-
-        const setls = getLocalCollection(`groups/${activeGroupId}/settlements`) as Settlement[];
-        setActiveGroupSettlements(setls);
-
-        const acts = getLocalCollection(`groups/${activeGroupId}/activities`) as Activity[];
-        acts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        setActiveGroupActivities(acts);
-      };
-      syncActiveGroup();
-      return subscribeToMockStore(syncActiveGroup);
     }
 
     // 1. Group info snapshot
@@ -361,6 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         navigate,
         groups,
         setGroups,
+        allExpenses,
         activeGroupId,
         setActiveGroupId,
         activeGroup,

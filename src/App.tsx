@@ -14,7 +14,9 @@ import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { LandingPage } from "./pages/LandingPage";
 import { Onboarding } from "./components/Onboarding";
+import { AssistantChat } from "./components/AssistantChat";
 import { NetworkHub } from "./pages/NetworkHub";
+import { Profile } from "./pages/Profile";
 import { Loader2 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faScaleBalanced, faStar } from "@fortawesome/free-solid-svg-icons";
@@ -63,8 +65,12 @@ const MainRouter: React.FC = () => {
         {currentRoute.path === "/settlements" && <Settlements />}
         {currentRoute.path === "/network" && <NetworkHub />}
         {currentRoute.path === "/reports" && <Reports />}
+        {currentRoute.path === "/profile" && <Profile />}
         {currentRoute.path === "/settings" && <Settings />}
       </main>
+
+      {/* Wallet assistant — available on every authenticated page */}
+      <AssistantChat />
     </div>
   );
 };
