@@ -214,6 +214,7 @@ export const Dashboard: React.FC = () => {
           value={inr(youAreOwed)}
           hint="Reimbursement suggestions"
           icon={TrendingUp}
+          tone="success"
         />
       </div>
 
@@ -415,7 +416,7 @@ const StatCard: React.FC<{
   value: string;
   hint: string;
   icon: React.ElementType;
-  tone?: "default" | "destructive";
+  tone?: "default" | "destructive" | "success";
 }> = ({ label, value, hint, icon: Icon, tone = "default" }) => (
   <Card>
     <CardHeader>
@@ -429,7 +430,7 @@ const StatCard: React.FC<{
     <CardContent className="flex flex-col gap-1">
       <div
         className={`text-3xl font-semibold tracking-tight tabular-nums ${
-          tone === "destructive" ? "text-destructive" : "text-foreground"
+          tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "text-foreground"
         }`}
       >
         {value}

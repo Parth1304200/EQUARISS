@@ -18,22 +18,18 @@ import { AssistantChat } from "./components/AssistantChat";
 import { NetworkHub } from "./pages/NetworkHub";
 import { Profile } from "./pages/Profile";
 import { Loader2 } from "lucide-react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faScaleBalanced, faStar } from "@fortawesome/free-solid-svg-icons";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 
 const MainRouter: React.FC = () => {
-  const { currentRoute, isLoadingAuth, user, profile, theme } = useApp();
+  const { currentRoute, isLoadingAuth, user, profile } = useApp();
 
   if (isLoadingAuth) {
     return (
-      <div className={`w-screen h-screen flex flex-col justify-center items-center gap-4 transition-colors duration-300 ${
-        theme === "dark" ? "bg-slate-950 text-white" : "bg-[#F9FAFB] text-slate-800"
-      }`}>
-        <Loader2 className={`w-8 h-8 animate-spin ${theme === "dark" ? "text-cyan-400" : "text-black"}`} />
-        <span className="text-xs font-semibold text-gray-400 font-mono tracking-widest uppercase flex items-center gap-1.5">
-          Initializing Dispute...
-          <FontAwesomeIcon icon={faScaleBalanced} className="text-cyan-400" />
-          <FontAwesomeIcon icon={faStar} className="text-yellow-400 animate-pulse text-[10px]" />
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          Initializing Equaris
         </span>
       </div>
     );
@@ -50,14 +46,10 @@ const MainRouter: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col md:flex-row transition-colors duration-300 ${
-      theme === "dark" ? "bg-slate-950 text-slate-100" : "bg-[#F9FAFB] text-slate-800"
-    }`}>
-      {/* SIDEBAR OR MOBILE HEADER CONTAINER */}
+    <div className="flex min-h-screen flex-col bg-background font-sans text-foreground md:flex-row">
       <Navbar />
-      
-      {/* MAIN VIEWPORT PORTAL */}
-      <main className="flex-1 min-h-screen md:h-screen md:overflow-y-auto pb-16 md:pb-0 px-4 md:px-8 py-6">
+
+      <main className="min-h-screen flex-1 px-4 py-6 pb-16 md:h-screen md:overflow-y-auto md:px-8 md:pb-0">
         {currentRoute.path === "/login" && <LandingPage />}
         {currentRoute.path === "/dashboard" && <Dashboard />}
         {currentRoute.path === "/groups" && <Groups />}
@@ -78,7 +70,10 @@ const MainRouter: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <MainRouter />
+      <TooltipProvider>
+        <MainRouter />
+        <Toaster position="top-right" />
+      </TooltipProvider>
     </AppProvider>
   );
 }
