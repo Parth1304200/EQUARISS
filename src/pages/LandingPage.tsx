@@ -30,6 +30,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { EquarisLogo } from "../components/EquarisLogo";
+import heroIllustration from "@/assets/hero.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,59 +71,6 @@ const GoogleG = () => (
     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
     <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z" />
-  </svg>
-);
-
-/** Hand-built line-art hero scene — two people settling up at a cafe. */
-const HeroIllustration: React.FC = () => (
-  <svg viewBox="0 0 560 470" className="h-auto w-full" fill="none" role="img" aria-label="Two people splitting a bill at a cafe">
-    <g stroke="var(--primary)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-      {/* organic backdrop blob */}
-      <path
-        d="M300 30c96-10 180 34 205 120 22 76-6 150-70 196-70 50-176 60-256 22C95 350 44 300 40 224 36 150 84 76 158 46c46-19 96-11 142-16Z"
-        stroke="var(--gold)"
-        strokeWidth={2}
-        opacity={0.9}
-      />
-
-      {/* pendant lamps */}
-      <path d="M235 30v40" strokeWidth={2} />
-      <path d="M215 92a20 12 0 0 1 40 0Z" fill="var(--secondary)" />
-      <path d="M355 30v58" strokeWidth={2} />
-      <path d="M337 108a18 11 0 0 1 36 0Z" fill="var(--secondary)" />
-
-      {/* table */}
-      <ellipse cx="292" cy="300" rx="78" ry="18" fill="var(--secondary)" />
-      <path d="M292 300v70M262 370h60" strokeWidth={3} />
-
-      {/* coffee cup + steam */}
-      <path d="M280 286h26v-14h-26z" fill="var(--card)" />
-      <path d="M306 274h6a5 5 0 0 1 0 10h-6" strokeWidth={2.5} />
-      <path d="M288 262c-4-5 4-8 0-13M298 262c-4-5 4-8 0-13" strokeWidth={2} stroke="var(--gold)" />
-
-      {/* left figure (seated) */}
-      <path d="M150 300c8-40 6-70 40-72 30-2 40 26 40 58" fill="var(--secondary)" />
-      <circle cx="188" cy="196" r="24" fill="var(--card)" />
-      <path d="M164 194c0-20 12-32 24-32s24 12 24 30c-8-8-14-10-24-10s-18 6-24 12Z" fill="var(--primary)" stroke="none" />
-      <path d="M158 300c-6 34-4 60 4 84M226 300c8 26 6 54-2 82" strokeWidth={3} />
-      <path d="M210 262c18 8 34 18 44 34" strokeWidth={3} />
-      {/* left chair */}
-      <path d="M140 300v96M132 396h64" strokeWidth={2.5} stroke="var(--gold)" />
-
-      {/* right figure (seated) */}
-      <path d="M356 300c-6-42-4-72 40-74 34-2 40 30 40 62" fill="var(--primary)" />
-      <circle cx="398" cy="198" r="24" fill="var(--card)" stroke="var(--primary)" />
-      <path d="M374 196c0-20 12-32 24-32s24 12 24 30c-8-8-14-10-24-10s-18 6-24 12Z" fill="var(--foreground)" stroke="none" />
-      <path d="M370 300c-8 30-6 58 2 84M432 300c6 28 4 56-4 82" strokeWidth={3} />
-      <path d="M372 258c-14 8-24 20-30 36" strokeWidth={3} />
-      {/* phone in right hand */}
-      <rect x="338" y="286" width="16" height="26" rx="3" fill="var(--card)" transform="rotate(-18 346 299)" />
-      {/* right chair */}
-      <path d="M452 300v96M424 396h60" strokeWidth={2.5} stroke="var(--gold)" />
-
-      {/* floor line */}
-      <path d="M110 402h372" strokeWidth={2} stroke="var(--border)" />
-    </g>
   </svg>
 );
 
@@ -261,7 +209,11 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
 
         {/* Right */}
         <div className="flex flex-col gap-6">
-          <HeroIllustration />
+          <img
+            src={heroIllustration}
+            alt="Two people splitting a bill at a cafe"
+            className="h-auto w-full"
+          />
 
           <div className="grid grid-cols-1 gap-6 border-t pt-6 sm:grid-cols-2">
             <ul className="flex flex-col gap-3">
