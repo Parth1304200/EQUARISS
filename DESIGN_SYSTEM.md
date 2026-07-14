@@ -25,7 +25,8 @@ Semantic tokens only — reference them as Tailwind classes (`bg-primary`,
 | `secondary` / `secondary-foreground` | Secondary buttons/fills | neutral |
 | `muted` / `muted-foreground` | Subdued surfaces, helper/label text | stone |
 | `accent` / `accent-foreground` | Hover fills, subtle highlights | stone |
-| `destructive` | Delete / danger only | red `oklch(.577 .245 27.3)` |
+| `destructive` | Delete / danger, money owed | red `oklch(.577 .245 27.3)` |
+| `success` / `success-foreground` | Positive money states ("you are owed"), confirmations | green `oklch(.596 .145 163)` |
 | `border` / `input` / `ring` | Borders, field borders, focus ring | — |
 | `chart-1…5` | Data viz series | stone ramp |
 | `sidebar*` | Navigation shell surfaces | — |
@@ -34,9 +35,9 @@ Every token has a light (`:root`) and dark (`.dark`) value. Contrast pairs meet
 WCAG AA. Dark mode is toggled by a `.dark` class on `<html>` (managed in
 `AppContext`); the theme switch animates via the body color transition.
 
-**Semantic intent:** success/positive states use `primary` sparingly or a chart
-token; `destructive` is reserved strictly for irreversible actions. Do not
-introduce green/yellow/cyan one-offs — if a status needs a color, add a token.
+**Semantic intent:** positive money/confirmation states use `success` (green);
+`destructive` (red) covers both danger/irreversible actions and money owed.
+Do not introduce cyan/yellow one-offs — if a status needs a color, add a token.
 
 ---
 
