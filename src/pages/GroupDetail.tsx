@@ -554,6 +554,8 @@ export const GroupDetail: React.FC = () => {
     );
   }
 
+  const memberNames = activeGroup.memberNames || {};
+
 
 
   return (
@@ -611,10 +613,10 @@ export const GroupDetail: React.FC = () => {
               {activeGroup.members.map((memberId) => (
                 <div 
                   key={memberId} 
-                  title={activeGroup.memberNames[memberId]}
+                  title={memberNames[memberId]}
                   className="w-7.5 h-7.5 rounded-full border border-background bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground shadow-3xs"
                 >
-                  {activeGroup.memberNames[memberId]?.[0] || "M"}
+                  {memberNames[memberId]?.[0] || "M"}
                 </div>
               ))}
             </div>
@@ -937,10 +939,10 @@ export const GroupDetail: React.FC = () => {
                   <div key={memberId} className="p-5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8.5 h-8.5 rounded-full bg-gray-50 border border-gray-150 flex items-center justify-center font-bold text-xs text-gray-800">
-                        {activeGroup.memberNames[memberId]?.[0] || "U"}
+                        {memberNames[memberId]?.[0] || "U"}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-900">{activeGroup.memberNames[memberId]}</span>
+                        <span className="text-xs font-bold text-gray-900">{memberNames[memberId] || "Member"}</span>
                         <span className="text-[10px] text-gray-400 font-mono">
                           {memberId === user?.uid ? "You (active user)" : "Participant"}
                         </span>

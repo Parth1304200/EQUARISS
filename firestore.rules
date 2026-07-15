@@ -134,7 +134,7 @@ service cloud.firestore {
              data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
              data.amount is number && data.amount > 0 &&
              data.paidBy is string &&
-             data.splitType is string && (data.splitType == 'equal' || data.splitType == 'exact' || data.splitType == 'percentage');
+             data.splitType is string && (data.splitType == 'equal' || data.splitType == 'exact' || data.splitType == 'percentage' || data.splitType == 'custom');
     }
 
     // 4. Settlements subcollection
@@ -159,9 +159,9 @@ service cloud.firestore {
 
     // 5. Activities subcollection
     match /groups/{groupId}/activities/{activityId} {
-      allow get: if isVerifiedUser() && isValidId(groupId) && isValidId(activityId) && isGroupMember(groupId);
+      allow get: if isVerifiedUser() && isValidId(groupId) && isGroupMember(groupId);
       allow list: if isVerifiedUser() && isValidId(groupId) && isGroupMember(groupId);
-      allow create: if isVerifiedUser() && isValidId(groupId) && isValidId(activityId) && isGroupMember(groupId) && isValidActivity(incoming());
+      allow create: if isVerifiedUser() && isValidId(groupId) && isValidId(activityId) && isValidActivity(incoming());
       allow update: if false; // Activities are write-once audit logs!
       allow delete: if false;
     }
@@ -171,7 +171,7 @@ service cloud.firestore {
              data.groupId is string && data.groupId.size() <= 128 &&
              data.category is string &&
              data.message is string && data.message.size() <= 500 &&
-             data.actorId is string;
+             data.actorId is string && data.actorId == request.auth.uid;
     }
 
     // 6. Subscriptions collection
