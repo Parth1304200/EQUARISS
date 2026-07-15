@@ -268,9 +268,7 @@ export const Groups: React.FC = () => {
           </div>
         ))}
         {groups.length === 0 && (
-          <div className={`col-span-full border-2 border-dashed rounded-3xl p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-3 ${
-            theme === "dark" ? "border-white/5" : "border-gray-200"
-          }`}>
+          <div className="col-span-full border rounded-3xl p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-3 border-border">
             <FolderOpen className="w-8 h-8 text-gray-500" />
             <p className="text-xs font-mono font-bold max-w-sm">
               You don't belong to any groups yet. Tap "New Group" to start building your share pool!
