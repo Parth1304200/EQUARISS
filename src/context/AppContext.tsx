@@ -8,7 +8,7 @@ import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, query, where, doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { Group, Expense, Settlement, Activity, UserProfile, Subscription } from "../types";
-import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbGetDoc, dbUpdateDoc } from "../lib/firestoreQuery";
 
 interface RouteConfig {
   path: string;
@@ -183,6 +183,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (docSnap.exists()) {
               const data = docSnap.data() as UserProfile;
               setProfile(data);
+
+              // Auto-sync Google photoURL if it differs or is missing in Firestore
+              if (currentUser.photoURL && data.photoURL !== currentUser.photoURL) {
+                dbUpdateDoc("users", currentUser.uid, { photoURL: currentUser.photoURL }).catch(console.error);
+              }
+
               if (isFirstLoad) {
                 isFirstLoad = false;
                 setIsLoadingAuth(false);
