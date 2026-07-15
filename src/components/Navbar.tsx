@@ -92,10 +92,10 @@ export const Navbar: React.FC = () => {
   const Brand = ({ onClick, className }: { onClick?: () => void; className?: string }) => (
     <button
       onClick={onClick}
-      className={cn("group flex cursor-pointer select-none items-center gap-2.5 outline-none", className)}
+      className={cn("group flex cursor-pointer select-none items-center gap-3.5 outline-none", className)}
     >
-      <EquarisLogo className="h-7 w-auto shrink-0 transition-transform group-hover:scale-105" />
-      <span className="font-heading text-xl font-bold tracking-tight">Equaris</span>
+      <EquarisLogo className="h-9 w-auto shrink-0 transition-transform group-hover:scale-105" />
+      <span className="font-heading text-[25px] font-bold tracking-tight">Equaris</span>
     </button>
   );
 
