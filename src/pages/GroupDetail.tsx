@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { 
   Users, 
   Plus, 
@@ -103,6 +104,7 @@ export const GroupDetail: React.FC = () => {
   const [scanResult, setScanResult] = useState<any>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // PDF statement generator trigger
   const handlePrintStatement = () => {
@@ -160,6 +162,19 @@ export const GroupDetail: React.FC = () => {
       refetchActiveGroupData();
     } catch (err) {
       console.error("Failed to end the trip:", err);
+    }
+  };
+
+  const handleDeleteGroupConfirmed = async () => {
+    setShowDeleteConfirm(false);
+    if (!activeGroup || !user) return;
+    try {
+      await dbDeleteDoc("groups", activeGroup.id);
+      toast.success("Group deleted successfully");
+      navigate("/groups");
+    } catch (err) {
+      console.error("Failed to delete group:", err);
+      toast.error("Failed to delete group");
     }
   };
 
@@ -567,17 +582,24 @@ export const GroupDetail: React.FC = () => {
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
               {activeGroup.description || "Track shared group bills and peer settled accounts cleanly."}
             </p>
-            {activeGroup.status !== "ended" && (
-              <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex gap-2">
+              {activeGroup.status !== "ended" && (
                 <Button 
                   onClick={() => setShowEndConfirm(true)} 
                   variant="outline" 
-                  className="border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase"
+                  className="border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase animate-fade-in"
                 >
                   End Trip
                 </Button>
-              </div>
-            )}
+              )}
+              <Button 
+                onClick={() => setShowDeleteConfirm(true)} 
+                variant="outline" 
+                className="border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase animate-fade-in"
+              >
+                Delete Group
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1521,6 +1543,29 @@ export const GroupDetail: React.FC = () => {
               className="cursor-pointer rounded-xl text-xs h-9.5 bg-destructive text-white hover:bg-destructive/90"
             >
               End Trip
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* DELETE GROUP CONFIRMATION ALERT DIALOG */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this group permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This group, along with all its expenses, settlements, and activity logs, will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline" size="default" className="cursor-pointer rounded-xl text-xs h-9.5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteGroupConfirmed}
+              className="cursor-pointer rounded-xl text-xs h-9.5 bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete Group
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

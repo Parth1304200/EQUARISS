@@ -311,10 +311,10 @@ export const Dashboard: React.FC = () => {
   const eyebrow = "text-xs font-mono uppercase tracking-widest text-muted-foreground";
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
 
       {/* Header */}
-      <div className="flex flex-col justify-between gap-5 border-b pb-8 sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-5 border-b pb-4 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-1.5">
           <span className={eyebrow}>Overview</span>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">

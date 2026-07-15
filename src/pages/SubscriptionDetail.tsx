@@ -179,21 +179,42 @@ export const SubscriptionDetail: React.FC = () => {
             <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button
-              onClick={toggleStatus}
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {sub.status === "active" ? (
-                <>
-                  <Pause className="size-4" /> Pause Billing
-                </>
-              ) : (
-                <>
-                  <Play className="size-4" /> Resume Billing
-                </>
-              )}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {sub.status === "active" ? (
+                    <>
+                      <Pause className="size-4" /> Pause Billing
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-4" /> Resume Billing
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {sub.status === "active" ? "Pause subscription billing?" : "Resume subscription billing?"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {sub.status === "active"
+                      ? "This will pause automatic logging of this subscription into the ledger until resumed."
+                      : "This will resume automatic logging of this subscription on its next billing renewal date."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogAction onClick={toggleStatus}>
+                    Confirm {sub.status === "active" ? "Pause" : "Resume"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
