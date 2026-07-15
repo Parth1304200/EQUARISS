@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc } from "firebase/firestore";
-import { dbSetDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbDeleteDoc } from "../lib/firestoreQuery";
 import { toast } from "sonner";
 import { 
   Users, 
@@ -27,6 +27,7 @@ import {
   Home as HomeIcon,
   GraduationCap,
   Rocket,
+  Trash2,
 } from "lucide-react";
 
 const CONTEXT_PRESETS = {
@@ -85,6 +86,24 @@ export const Groups: React.FC = () => {
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<any[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
+
+  // Delete group state
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDeleteGroupFromCard = async () => {
+    if (!deleteTarget) return;
+    try {
+      await dbDeleteDoc("groups", deleteTarget);
+      toast.success("Group deleted successfully");
+    } catch (err) {
+      console.error("Failed to delete group:", err);
+      toast.error("Failed to delete group");
+    } finally {
+      setDeleteTarget(null);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   // Load verified connected friends
   const loadEligibleFriends = async () => {
@@ -239,12 +258,12 @@ export const Groups: React.FC = () => {
       </div>
 
       {/* Main card list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 place-items-center">
         {groups.map((g) => (
           <div
             key={g.id}
             onClick={() => navigate("/groups/[id]", { id: g.id })}
-            className={`border rounded-2xl p-6 transition-all cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs ${
+            className={`border rounded-2xl p-6 transition-all cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs w-full ${
               theme === "dark" 
                 ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/30" 
                 : "bg-white border-slate-200/80 hover:border-slate-300 shadow-sm"
@@ -258,12 +277,14 @@ export const Groups: React.FC = () => {
                   {g.name?.[0] || "G"}
                 </div>
                 <span className={`text-[9px] font-mono select-none px-2 py-0.5 border rounded-full font-bold ${
-                  theme === "dark" ? "border-cyan-500/20 text-cyan-400 bg-cyan-500/5 bg-opacity-20" : "border-slate-150 text-slate-500 bg-slate-50"
-                }`}>ACTIVE</span>
+                  g.status === "ended"
+                    ? "border-red-200 text-red-500 bg-red-50"
+                    : theme === "dark" ? "border-cyan-500/20 text-cyan-400 bg-cyan-500/5 bg-opacity-20" : "border-slate-150 text-slate-500 bg-slate-50"
+                }`}>{g.status === "ended" ? "ENDED" : "ACTIVE"}</span>
               </div>
 
               <div className="flex flex-col">
-                <h3 className="text-sm font-bold tracking-tight transition-colors group-hover:text-cyan-400">{g.name}</h3>
+                <h3 className="text-sm font-bold tracking-tight transition-colors group-hover:text-primary">{g.name}</h3>
                 {g.description && <p className="text-xs text-gray-400 line-clamp-2 mt-1 leading-relaxed">{g.description}</p>}
               </div>
             </div>
@@ -273,9 +294,22 @@ export const Groups: React.FC = () => {
                 <Users className="w-3.5 h-3.5 text-gray-500" />
                 {g.members.length} MEMBERS
               </span>
-              <span className="text-gray-400 font-bold flex items-center font-mono">
-                {g.budget ? `₹${g.budget.toLocaleString("en-IN")} LIMIT` : "NO LIMIT"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 font-bold flex items-center font-mono">
+                  {g.budget ? `₹${g.budget.toLocaleString("en-IN")} LIMIT` : "NO LIMIT"}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTarget(g.id);
+                    setShowDeleteConfirm(true);
+                  }}
+                  title="Delete Group"
+                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -569,6 +603,36 @@ export const Groups: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 flex flex-col gap-5 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col gap-2">
+              <h3 className="font-sans font-black text-lg uppercase tracking-tight">Delete this group?</h3>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                This action cannot be undone. This group, along with all its expenses, settlements, and activity logs, will be permanently deleted.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setShowDeleteConfirm(false);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold font-mono uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteGroupFromCard}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 text-white text-xs font-bold font-mono uppercase tracking-wider hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                Delete Group
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -9,9 +9,6 @@ import { dbSetDoc, dbAddDoc, dbDeleteDoc, dbUpdateDoc, dbGetDoc } from "../lib/f
 import { calculateBalances, generateSettlementSuggestions } from "../lib/settleEngine";
 import { SettleProofModal } from "../components/SettleProofModal";
 import QRCode from "qrcode";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -154,8 +151,8 @@ export const GroupDetail: React.FC = () => {
       await dbSetDoc(`groups/${activeGroup.id}/activities`, activityId, {
         id: activityId,
         groupId: activeGroup.id,
-        category: "trip_ended",
-        message: `${profile.name} ended the trip "${activeGroup.name}". Balances are closed.`,
+        category: "split_ended",
+        message: `${profile.name} ended the split "${activeGroup.name}". Balances are closed.`,
         actorId: user.uid,
         createdAt: new Date().toISOString()
       });
@@ -586,21 +583,19 @@ export const GroupDetail: React.FC = () => {
             </p>
             <div className="mt-1 flex gap-2">
               {activeGroup.status !== "ended" && (
-                <Button 
+                <button 
                   onClick={() => setShowEndConfirm(true)} 
-                  variant="outline" 
-                  className="border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase animate-fade-in"
+                  className="border border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase bg-transparent transition-colors"
                 >
-                  End Trip
-                </Button>
+                  End Split
+                </button>
               )}
-              <Button 
+              <button 
                 onClick={() => setShowDeleteConfirm(true)} 
-                variant="outline" 
-                className="border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase animate-fade-in"
+                className="border border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase bg-transparent transition-colors"
               >
                 Delete Group
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -1292,11 +1287,11 @@ export const GroupDetail: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Budget Progress Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Limit vs Actual Spend</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+              <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-5 pb-2">
+                  <h4 className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Limit vs Actual Spend</h4>
+                </div>
+                <div className="px-5 pb-5 flex flex-col gap-4">
                   <div>
                     <div className="flex justify-between text-xs font-semibold mb-1">
                       <span>Total Spent: ₹{overallActiveSpent.toLocaleString("en-IN")}</span>
@@ -1334,15 +1329,15 @@ export const GroupDetail: React.FC = () => {
                       <p className="text-sm font-semibold mt-1">₹{activeGroup.budgetConfig.perDayCap.toLocaleString("en-IN")} / day Limit</p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Update Budget Configuration Form */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Configure Budget</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-5 pb-2">
+                  <h4 className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Configure Budget</h4>
+                </div>
+                <div className="px-5 pb-5">
                   <form 
                     onSubmit={async (e) => {
                       e.preventDefault();
@@ -1357,21 +1352,25 @@ export const GroupDetail: React.FC = () => {
                           perDayCap: dailyCap
                         };
 
-                        await updateDoc(doc(db, "groups", activeGroup.id), {
+                        await dbUpdateDoc("groups", activeGroup.id, {
                           budget: totalLimit,
                           budgetConfig: updatedConfig
                         });
                         
-                        // Log activity
-                        const actId = `act_${Date.now()}`;
-                        await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
-                          id: actId,
-                          groupId: activeGroup.id,
-                          category: "budget_changed",
-                          message: `${profile?.name || "Someone"} updated the budget cap to ₹${totalLimit ? totalLimit.toLocaleString("en-IN") : "Unlimited"}.`,
-                          actorId: user?.uid || "",
-                          createdAt: new Date().toISOString()
-                        });
+                        // Log activity (non-blocking)
+                        try {
+                          const actId = `act_${Date.now()}`;
+                          await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
+                            id: actId,
+                            groupId: activeGroup.id,
+                            category: "budget_changed",
+                            message: `${profile?.name || "Someone"} updated the budget cap to ₹${totalLimit ? totalLimit.toLocaleString("en-IN") : "Unlimited"}.`,
+                            actorId: user?.uid || "",
+                            createdAt: new Date().toISOString()
+                          });
+                        } catch (actErr) {
+                          console.warn("Activity log failed (non-critical):", actErr);
+                        }
 
                         toast.success("Budget updated successfully!");
                         refetchActiveGroupData();
@@ -1383,33 +1382,35 @@ export const GroupDetail: React.FC = () => {
                     className="flex flex-col gap-4 text-xs"
                   >
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="totalLimit">Total Budget Cap (₹)</Label>
-                      <Input 
+                      <label htmlFor="totalLimit" className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Total Budget Cap (₹)</label>
+                      <input 
                         id="totalLimit" 
                         name="totalLimit"
                         type="number" 
                         defaultValue={activeGroup.budgetConfig?.totalCap || activeGroup.budget || ""} 
                         placeholder="e.g. 50000"
+                        className="w-full text-xs py-2.5 px-3 rounded-xl border border-slate-200 focus:outline-none bg-slate-50 focus:border-black text-slate-800 transition-all"
                       />
                     </div>
 
                     {activeGroup.type === "trip" && (
                       <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="dailyCap">Daily Pacing Limit (₹)</Label>
-                        <Input 
+                        <label htmlFor="dailyCap" className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Daily Pacing Limit (₹)</label>
+                        <input 
                           id="dailyCap" 
                           name="dailyCap"
                           type="number" 
                           defaultValue={activeGroup.budgetConfig?.perDayCap || ""} 
                           placeholder="e.g. 5000"
+                          className="w-full text-xs py-2.5 px-3 rounded-xl border border-slate-200 focus:outline-none bg-slate-50 focus:border-black text-slate-800 transition-all"
                         />
                       </div>
                     )}
 
-                    <Button type="submit" className="w-full mt-2">Save Configuration</Button>
+                    <button type="submit" className="w-full mt-2 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold font-mono uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer">Save Configuration</button>
                   </form>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1527,11 +1528,11 @@ export const GroupDetail: React.FC = () => {
         }}
       />
 
-      {/* END TRIP CONFIRMATION ALERT DIALOG */}
+      {/* END SPLIT CONFIRMATION ALERT DIALOG */}
       <AlertDialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>End this trip permanently?</AlertDialogTitle>
+            <AlertDialogTitle>End this split permanently?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. All active balances will be locked and this group will be stored as archived/ended.
             </AlertDialogDescription>
@@ -1544,7 +1545,7 @@ export const GroupDetail: React.FC = () => {
               onClick={handleEndTripConfirmed}
               className="cursor-pointer rounded-xl text-xs h-9.5 bg-destructive text-white hover:bg-destructive/90"
             >
-              End Trip
+              End Split
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
