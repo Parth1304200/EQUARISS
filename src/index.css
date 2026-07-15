@@ -170,10 +170,30 @@ textarea:focus {
 }
 
 /* Enforce continuous thin dark solid borders on all cards, boxes, and panel borders */
-.border, .border-t, .border-b, .border-l, .border-r {
+.border {
   border-style: solid !important;
   border-width: 1px !important;
   border-color: var(--border) !important;
+}
+.border-t {
+  border-top-style: solid !important;
+  border-top-width: 1px !important;
+  border-top-color: var(--border) !important;
+}
+.border-b {
+  border-bottom-style: solid !important;
+  border-bottom-width: 1px !important;
+  border-bottom-color: var(--border) !important;
+}
+.border-l {
+  border-left-style: solid !important;
+  border-left-width: 1px !important;
+  border-left-color: var(--border) !important;
+}
+.border-r {
+  border-right-style: solid !important;
+  border-right-width: 1px !important;
+  border-right-color: var(--border) !important;
 }
 
 /* Prevent dotted or dashed patterns in container borders */
