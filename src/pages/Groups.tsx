@@ -243,7 +243,7 @@ export const Groups: React.FC = () => {
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-extrabold text-lg uppercase ${
                   theme === "dark" ? "bg-slate-950 border border-white/5 text-cyan-400" : "bg-slate-50 border border-slate-150 text-slate-700"
                 }`}>
-                  {g.name[0]}
+                  {g.name?.[0] || "G"}
                 </div>
                 <span className={`text-[9px] font-mono select-none px-2 py-0.5 border rounded-full font-bold ${
                   theme === "dark" ? "border-cyan-500/20 text-cyan-400 bg-cyan-500/5 bg-opacity-20" : "border-slate-150 text-slate-500 bg-slate-50"
@@ -507,14 +507,14 @@ export const Groups: React.FC = () => {
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-mono text-xs overflow-hidden shrink-0">
                                 {f.photoURL ? (
-                                  <img src={f.photoURL} alt={f.name} referrerPolicy="no-referrer" />
+                                  <img src={f.photoURL} alt={f.name || "Friend"} referrerPolicy="no-referrer" />
                                 ) : (
-                                  <span>{f.name[0]}</span>
+                                  <span>{f.name?.[0] || "F"}</span>
                                 )}
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-xs font-semibold leading-tight">{f.name} {f.surname || ""}</span>
-                                <span className="text-[10px] text-gray-400 font-mono leading-none mt-1">@{f.username}</span>
+                                <span className="text-xs font-semibold leading-tight">{(f.name || "")} {(f.surname || "")}</span>
+                                <span className="text-[10px] text-gray-400 font-mono leading-none mt-1">@{f.username || "user"}</span>
                               </div>
                             </div>
 
