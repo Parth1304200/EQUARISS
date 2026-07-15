@@ -592,7 +592,7 @@ export const GroupDetail: React.FC = () => {
               )}
               <button 
                 onClick={() => setShowDeleteConfirm(true)} 
-                className="border border-red-200 hover:border-red-350 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase bg-transparent transition-colors"
+                className="bg-red-600 text-white hover:bg-red-700 cursor-pointer text-[10px] h-7 px-3 rounded-lg font-bold font-mono tracking-wider uppercase transition-colors"
               >
                 Delete Group
               </button>
