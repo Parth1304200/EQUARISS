@@ -173,5 +173,11 @@ service cloud.firestore {
              data.message is string && data.message.size() <= 500 &&
              data.actorId is string;
     }
+
+    // 6. Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if isVerifiedUser();
+      allow write: if isVerifiedUser() && (request.method == 'delete' || incoming().ownerId == request.auth.uid);
+    }
   }
 }

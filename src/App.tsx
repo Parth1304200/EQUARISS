@@ -18,6 +18,10 @@ import { AssistantChat } from "./components/AssistantChat";
 import { LoginPage } from "./pages/LoginPage";
 import { NetworkHub } from "./pages/NetworkHub";
 import { Profile } from "./pages/Profile";
+import { Subscriptions } from "./pages/Subscriptions";
+import { AddSubscription } from "./pages/AddSubscription";
+import { SubscriptionDetail } from "./pages/SubscriptionDetail";
+import { MoneyManagement } from "./pages/MoneyManagement";
 import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -44,8 +48,8 @@ const MainRouter: React.FC = () => {
     return <LandingPage />;
   }
 
-  // Redirect to Onboarding if profile is not completed
-  if (profile && profile.isOnboarded === false) {
+  // Redirect to Onboarding if profile is not completed or missing
+  if (!profile || !profile.isOnboarded) {
     return <Onboarding />;
   }
 
@@ -57,6 +61,10 @@ const MainRouter: React.FC = () => {
         {(currentRoute.path === "/" || currentRoute.path === "/dashboard" || currentRoute.path === "/login" || currentRoute.path === "/signup") && <Dashboard />}
         {currentRoute.path === "/groups" && <Groups />}
         {currentRoute.path === "/groups/[id]" && <GroupDetail />}
+        {currentRoute.path === "/subscriptions" && <Subscriptions />}
+        {currentRoute.path === "/subscriptions/new" && <AddSubscription />}
+        {currentRoute.path === "/subscriptions/[id]" && <SubscriptionDetail />}
+        {currentRoute.path === "/money" && <MoneyManagement />}
         {currentRoute.path === "/settlements" && <Settlements />}
         {currentRoute.path === "/network" && <NetworkHub />}
         {currentRoute.path === "/reports" && <Reports />}

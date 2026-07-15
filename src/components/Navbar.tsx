@@ -17,6 +17,7 @@ import {
   CreditCard,
   Layers,
   Menu,
+  Calendar,
 } from "lucide-react";
 import { EquarisLogo } from "./EquarisLogo";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,8 @@ import {
 
 const LINKS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutGrid },
-  { label: "Groups", path: "/groups", icon: Layers },
+  { label: "Contexts", path: "/groups", icon: Layers },
+  { label: "Subscriptions", path: "/subscriptions", icon: Calendar },
   { label: "Network", path: "/network", icon: Users },
   { label: "Settlements", path: "/settlements", icon: CreditCard },
   { label: "Reports", path: "/reports", icon: PieChart },
@@ -61,8 +63,15 @@ export const Navbar: React.FC = () => {
 
   if (currentRoute.path === "/login") return null;
 
-  const isActive = (path: string) =>
-    currentRoute.path === path || (path === "/groups" && currentRoute.path === "/groups/[id]");
+  const isActive = (path: string) => {
+    if (path === "/groups") {
+      return currentRoute.path === "/groups" || currentRoute.path === "/groups/[id]";
+    }
+    if (path === "/subscriptions") {
+      return currentRoute.path === "/subscriptions" || currentRoute.path === "/subscriptions/new" || currentRoute.path === "/subscriptions/[id]";
+    }
+    return currentRoute.path === path;
+  };
 
   const go = (path: string) => {
     navigate(path);

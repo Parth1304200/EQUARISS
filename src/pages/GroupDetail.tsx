@@ -48,7 +48,8 @@ import {
   faLightbulb,
   faCamera,
   faClock,
-  faHome
+  faHome,
+  faWallet
 } from "@fortawesome/free-solid-svg-icons";
 
 export const GroupDetail: React.FC = () => {
@@ -63,7 +64,7 @@ export const GroupDetail: React.FC = () => {
     refetchActiveGroupData
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "receipts" | "timeline" | "roommate">("expenses");
+  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "receipts" | "timeline" | "roommate" | "budget">("expenses");
 
   // Roommate rent splitter states
   const [roommateRent, setRoommateRent] = useState("");
@@ -671,6 +672,7 @@ export const GroupDetail: React.FC = () => {
           { key: "expenses", label: "Group Expenses Logs", count: expensesOnly.length, faIcon: faFileLines },
           { key: "balances", label: "Peers Balances", count: null, faIcon: faScaleBalanced },
           { key: "suggest", label: "Smart Settlement Recommendations", count: liveSuggestions.length, faIcon: faLightbulb },
+          { key: "budget", label: "Budget & Limits", count: null, faIcon: faWallet },
           ...(activeGroup.category === "roommates" ? [{ key: "roommate", label: "Rent & Utilities Splitter", count: null, faIcon: faHome }] : []),
           { key: "receipts", label: "Scan Bills (AI Vision OCR)", count: null, faIcon: faCamera },
           { key: "timeline", label: "Activity Audit Log", count: activeGroupActivities.length, faIcon: faClock }
@@ -1250,6 +1252,140 @@ export const GroupDetail: React.FC = () => {
               {activeGroupActivities.length === 0 && (
                 <div className="text-gray-400 italic py-6">No audits captured yet. Log a transaction to see changes!</div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: Budget & Limits */}
+        {activeTab === "budget" && (
+          <div className="flex flex-col gap-6 text-left">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-gray-800" />
+                <h3 className="font-sans font-bold text-gray-900 text-lg">Context Budget & Limits</h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Budget Progress Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Limit vs Actual Spend</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                      <span>Total Spent: ₹{overallActiveSpent.toLocaleString("en-IN")}</span>
+                      <span>
+                        Limit: {activeGroup.budgetConfig?.totalCap ? `₹${activeGroup.budgetConfig.totalCap.toLocaleString("en-IN")}` : activeGroup.budget ? `₹${activeGroup.budget.toLocaleString("en-IN")}` : "No Limit"}
+                      </span>
+                    </div>
+
+                    {(activeGroup.budgetConfig?.totalCap || activeGroup.budget) ? (
+                      <div>
+                        <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-500 ease-out ${
+                              budgetRatio >= 100 
+                                ? "bg-destructive" 
+                                : budgetRatio >= 80 
+                                ? "bg-amber-500" 
+                                : "bg-success"
+                            }`}
+                            style={{ width: `${Math.min(budgetRatio, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono text-muted-foreground mt-1 block">
+                          {Math.round(budgetRatio)}% of budget limit spent
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">Set a budget limit to track progress bars and receive notifications.</p>
+                    )}
+                  </div>
+
+                  {activeGroup.type === "trip" && activeGroup.budgetConfig?.perDayCap && (
+                    <div className="border-t border-border pt-4">
+                      <span className="font-mono text-[10px] text-muted-foreground uppercase font-bold">Daily Burn Rate Cap</span>
+                      <p className="text-sm font-semibold mt-1">₹{activeGroup.budgetConfig.perDayCap.toLocaleString("en-IN")} / day Limit</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Update Budget Configuration Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider font-mono text-muted-foreground">Configure Budget</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const form = e.currentTarget;
+                      const totalLimit = (form.elements.namedItem("totalLimit") as HTMLInputElement).value ? Number((form.elements.namedItem("totalLimit") as HTMLInputElement).value) : null;
+                      const dailyCap = (form.elements.namedItem("dailyCap") as HTMLInputElement)?.value ? Number((form.elements.namedItem("dailyCap") as HTMLInputElement).value) : null;
+
+                      try {
+                        const updatedConfig = {
+                          ...(activeGroup.budgetConfig || {}),
+                          totalCap: totalLimit,
+                          perDayCap: dailyCap
+                        };
+
+                        await updateDoc(doc(db, "groups", activeGroup.id), {
+                          budget: totalLimit,
+                          budgetConfig: updatedConfig
+                        });
+                        
+                        // Log activity
+                        const actId = `act_${Date.now()}`;
+                        await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
+                          id: actId,
+                          groupId: activeGroup.id,
+                          category: "budget_changed",
+                          message: `${profile?.name || "Someone"} updated the budget cap to ₹${totalLimit ? totalLimit.toLocaleString("en-IN") : "Unlimited"}.`,
+                          actorId: user?.uid || "",
+                          createdAt: new Date().toISOString()
+                        });
+
+                        toast.success("Budget updated successfully!");
+                        refetchActiveGroupData();
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Failed to update budget");
+                      }
+                    }}
+                    className="flex flex-col gap-4 text-xs"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="totalLimit">Total Budget Cap (₹)</Label>
+                      <Input 
+                        id="totalLimit" 
+                        name="totalLimit"
+                        type="number" 
+                        defaultValue={activeGroup.budgetConfig?.totalCap || activeGroup.budget || ""} 
+                        placeholder="e.g. 50000"
+                      />
+                    </div>
+
+                    {activeGroup.type === "trip" && (
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="dailyCap">Daily Pacing Limit (₹)</Label>
+                        <Input 
+                          id="dailyCap" 
+                          name="dailyCap"
+                          type="number" 
+                          defaultValue={activeGroup.budgetConfig?.perDayCap || ""} 
+                          placeholder="e.g. 5000"
+                        />
+                      </div>
+                    )}
+
+                    <Button type="submit" className="w-full mt-2">Save Configuration</Button>
+                  </form>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}

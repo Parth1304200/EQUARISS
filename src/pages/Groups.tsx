@@ -21,18 +21,64 @@ import {
   FolderOpen,
   Info,
   Loader2,
-  Check
+  Check,
+  Plane,
+  Home as HomeIcon,
+  GraduationCap,
+  Rocket,
 } from "lucide-react";
+
+const CONTEXT_PRESETS = {
+  trip: {
+    label: "Trip",
+    icon: Plane,
+    description: "Vacations, road trips, weekend getaways",
+    categories: ["Stay", "Transport", "Food", "Activities", "Shopping", "Misc"]
+  },
+  roommates: {
+    icon: HomeIcon,
+    label: "Roommates",
+    description: "Shared apartments, flat utilities, rent, groceries",
+    categories: ["Rent", "Utilities", "Groceries", "Subscriptions", "Cleaning", "Misc"]
+  },
+  student: {
+    icon: GraduationCap,
+    label: "Student",
+    description: "Hostels, roommate mess fees, study books, transport",
+    categories: ["Mess/Food", "Books/Supplies", "Hostel Fees", "Transport", "Subscriptions", "Misc"]
+  },
+  startup: {
+    icon: Rocket,
+    label: "Startup",
+    description: "Software SaaS tools, shared marketing budgets, operations",
+    categories: ["Software/Tools", "Travel", "Equipment", "Marketing", "Contractor Payments", "Misc"]
+  },
+  group: {
+    icon: Users,
+    label: "Custom",
+    description: "General ad-hoc splits, outings, dining together",
+    categories: ["Food", "Entertainment", "Shopping", "Transport", "Misc"]
+  }
+};
 
 export const Groups: React.FC = () => {
   const { user, profile, groups, navigate, theme } = useApp();
   
   // Create group form state
   const [showModal, setShowModal] = useState(false);
+  const [creationStep, setCreationStep] = useState(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
-  const [category, setCategory] = useState("trip");
+  const [category, setCategory] = useState<"trip" | "roommates" | "student" | "startup" | "group">("trip");
+  const [currency, setCurrency] = useState("INR");
+
+  // Type specific inputs
+  const [tripStartDate, setTripStartDate] = useState("");
+  const [tripEndDate, setTripEndDate] = useState("");
+  const [tripDailyCap, setTripDailyCap] = useState("");
+  const [recurringMonthly, setRecurringMonthly] = useState(true);
+  const [messFeeAmount, setMessFeeAmount] = useState("");
   
   // Real friends list state
   const [friendsList, setFriendsList] = useState<any[]>([]);
@@ -94,6 +140,22 @@ export const Groups: React.FC = () => {
         namesRecord[f.uid] = f.name;
       });
 
+      // Budget Config
+      const budgetConfig: any = {
+        totalCap: budget.trim() ? Number(budget) : null,
+        recurring: (category === "roommates" || category === "startup") ? recurringMonthly : false
+      };
+
+      if (category === "trip") {
+        if (tripStartDate) budgetConfig.periodStart = tripStartDate;
+        if (tripEndDate) budgetConfig.periodEnd = tripEndDate;
+        if (tripDailyCap) budgetConfig.perDayCap = Number(tripDailyCap);
+      } else if (category === "student") {
+        if (tripStartDate) budgetConfig.periodStart = tripStartDate;
+        if (tripEndDate) budgetConfig.periodEnd = tripEndDate;
+        if (messFeeAmount) budgetConfig.messFeeAmount = Number(messFeeAmount);
+      }
+
       // Write group node securely
       const groupData = {
         id: newGroupId,
@@ -104,6 +166,10 @@ export const Groups: React.FC = () => {
         memberNames: namesRecord,
         budget: budget.trim() ? Number(budget) : null,
         category: category,
+        type: category,
+        currency,
+        budgetConfig,
+        defaultCategories: CONTEXT_PRESETS[category]?.categories || [],
         status: "active",
         createdAt: new Date().toISOString()
       };
@@ -126,6 +192,7 @@ export const Groups: React.FC = () => {
       setDescription("");
       setBudget("");
       setSelectedFriends([]);
+      setCreationStep(1);
       setShowModal(false);
       
       navigate("/groups/[id]", { id: newGroupId });
@@ -215,16 +282,15 @@ export const Groups: React.FC = () => {
       {/* Create Group Modal Backdrop Dialog */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`border rounded-2xl w-full max-w-lg p-6 sm:p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto shadow-2xl transition-all duration-300 ${
-            theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-white border-slate-200"
-          }`}>
+          <div className={`border rounded-2xl w-full max-w-lg p-6 sm:p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto shadow-2xl transition-all duration-300 bg-white border-slate-200`}>
             {/* Modal title */}
-            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-white/5">
-              <h2 className="font-sans font-black text-lg uppercase tracking-tight">Create Dispute Group</h2>
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h2 className="font-sans font-black text-lg uppercase tracking-tight">Create Context Ledger</h2>
               <button
                 id="close-group-modal-btn"
                 onClick={() => {
                   setSelectedFriends([]);
+                  setCreationStep(1);
                   setShowModal(false);
                 }}
                 className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer"
@@ -233,173 +299,259 @@ export const Groups: React.FC = () => {
               </button>
             </div>
 
-            {/* Input fields */}
-            <form onSubmit={handleCreateGroup} className="flex flex-col gap-5 text-left">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Group Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Goa Trip, Flatmates 2B, Weekend Chai"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={`w-full text-xs py-3 px-4 rounded-xl border focus:outline-none transition-all ${
-                    theme === "dark" 
-                      ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white" 
-                      : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
-                  }`}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">What is this pool for?</label>
-                <textarea
-                  placeholder="e.g. Rent, food split-settlements, and scuba tickets"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className={`w-full text-xs py-3 px-4 rounded-xl border focus:outline-none transition-all resize-none h-16 ${
-                    theme === "dark" 
-                      ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white" 
-                      : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
-                  }`}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Group Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className={`w-full text-xs py-2 px-3 rounded-xl border focus:outline-none transition-all h-9.5 ${
-                    theme === "dark" 
-                      ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white" 
-                      : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
-                  }`}
-                >
-                  <option value="trip">Trip / Travel</option>
-                  <option value="roommates">Roommates / Flatmates</option>
-                  <option value="couple">Couple / Partner</option>
-                  <option value="others">Others</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Aggregate spend Limit (₹)</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs leading-none">₹</span>
-                  <input
-                    type="number"
-                    placeholder="e.g. 35000"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    className={`w-full text-xs py-3 pl-8 pr-3 rounded-xl border focus:outline-none transition-all h-9.5 ${
-                      theme === "dark" 
-                        ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white" 
-                        : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
-                    }`}
-                  />
+            {creationStep === 1 ? (
+              <div className="flex flex-col gap-4 text-left">
+                <span className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">1. Select Context Type</span>
+                <div className="grid grid-cols-1 gap-3">
+                  {Object.entries(CONTEXT_PRESETS).map(([key, value]) => {
+                    const Icon = value.icon;
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => {
+                          setCategory(key as any);
+                          setCreationStep(2);
+                        }}
+                        className={`p-4 border rounded-xl flex items-center gap-4 cursor-pointer hover:border-primary transition-all hover:bg-muted/40`}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-primary/5 text-primary flex items-center justify-center">
+                          <Icon className="size-5" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase tracking-wider">{value.label}</span>
+                          <span className="text-[11px] text-muted-foreground">{value.description}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            ) : (
+              <form onSubmit={handleCreateGroup} className="flex flex-col gap-5 text-left">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Context Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Goa Trip, 221B Flat, Buildmint Ops"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full text-xs py-3 px-4 rounded-xl border border-slate-200 focus:outline-none bg-slate-50 focus:border-black text-slate-800 transition-all"
+                  />
+                </div>
 
-              {/* Members configuration block from true reciprocated follow connections */}
-              <div className="border-t border-gray-150 dark:border-white/5 pt-4 flex flex-col gap-3">
-                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold flex justify-between">
-                  <span>SELECT VERIFIED MEMBERS</span>
-                  <span className="text-cyan-400 font-bold">[ YOU ARE AUTOMATICALLY MEMBER ]</span>
-                </label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Description</label>
+                  <textarea
+                    placeholder="e.g. Rent splits, hostel mesh, or operations budget"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full text-xs py-3 px-4 rounded-xl border border-slate-200 focus:outline-none bg-slate-50 focus:border-black text-slate-800 transition-all resize-none h-16"
+                  />
+                </div>
 
-                {loadingFriends ? (
-                  <div className="flex py-4 justify-center">
-                    <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
-                  </div>
-                ) : friendsList.length === 0 ? (
-                  /* REDIRECT BANNER IF NO CONNECTIONS */
-                  <div className={`p-4 rounded-xl border flex flex-col gap-3 ${
-                    theme === "dark" ? "bg-amber-500/5 border-amber-500/10 text-amber-500" : "bg-amber-50 border-amber-200 text-amber-700"
-                  }`}>
-                    <div className="flex items-start gap-2.5">
-                      <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
-                      <div className="flex flex-col gap-0.5 text-xs font-medium">
-                        <span className="font-bold uppercase font-mono">No Connections Verified</span>
-                        <span>Dispute forces a safe network: Only mutually accepted friends are eligible to join sharing groups. Connect with members first!</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedFriends([]);
-                        setShowModal(false);
-                        navigate("/network");
-                      }}
-                      className={`py-2 px-3 self-start rounded-lg text-[10px] font-mono font-bold uppercase transition-transform hover:scale-[1.01] cursor-pointer ${
-                        theme === "dark" ? "bg-amber-500 text-black hover:bg-amber-400" : "bg-amber-600 text-white"
-                      }`}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Currency</label>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
                     >
-                      [ GOTO CONNECTIONS CENTER ]
-                    </button>
+                      <option value="INR">INR (₹)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                    </select>
                   </div>
-                ) : (
-                  /* FRIEND CHECKBOX GRID */
-                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
-                    {friendsList.map((f) => {
-                      const isSelected = selectedFriends.some((item) => item.uid === f.uid);
-                      return (
-                        <div
-                          key={f.uid}
-                          onClick={() => handleToggleFriend(f)}
-                          className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                            isSelected 
-                              ? theme === "dark"
-                                ? "bg-cyan-500/10 border-cyan-500 text-white"
-                                : "bg-indigo-50 border-black text-black font-semibold"
-                              : theme === "dark"
-                                ? "bg-slate-950/60 border-white/5 text-slate-300 hover:border-white/10"
-                                : "bg-slate-50 border-slate-200 text-slate-800 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-mono text-xs overflow-hidden shrink-0">
-                              {f.photoURL ? (
-                                <img src={f.photoURL} alt={f.name} referrerPolicy="no-referrer" />
-                              ) : (
-                                <span>{f.name[0]}</span>
-                              )}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold leading-tight">{f.name} {f.surname || ""}</span>
-                              <span className="text-[10px] text-gray-400 font-mono leading-none mt-1">@{f.username}</span>
-                            </div>
-                          </div>
 
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                            isSelected 
-                              ? "bg-cyan-500 border-cyan-500 text-black" 
-                              : "border-gray-300"
-                          }`}>
-                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Budget Cap</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {category === "trip" && (
+                  <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Start Date</label>
+                      <input
+                        type="date"
+                        value={tripStartDate}
+                        onChange={(e) => setTripStartDate(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">End Date</label>
+                      <input
+                        type="date"
+                        value={tripEndDate}
+                        onChange={(e) => setTripEndDate(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 col-span-2">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Daily Spend Cap</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5000"
+                        value={tripDailyCap}
+                        onChange={(e) => setTripDailyCap(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Action trigger button */}
-              {friendsList.length > 0 && (
-                <button
-                  type="submit"
-                  id="create-group-submit-btn"
-                  className={`w-full py-4 mt-4 rounded-xl font-bold font-mono text-xs tracking-wider uppercase shadow-md transition-all cursor-pointer ${
-                    theme === "dark"
-                      ? "bg-cyan-500 text-black hover:bg-cyan-400"
-                      : "bg-black text-white hover:bg-slate-800"
-                  }`}
-                >
-                  Create and initialize Ledger
-                </button>
-              )}
-            </form>
+                {category === "student" && (
+                  <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Semester Start</label>
+                      <input
+                        type="date"
+                        value={tripStartDate}
+                        onChange={(e) => setTripStartDate(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Semester End</label>
+                      <input
+                        type="date"
+                        value={tripEndDate}
+                        onChange={(e) => setTripEndDate(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 col-span-2">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Mess Fee Amount</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 15000"
+                        value={messFeeAmount}
+                        onChange={(e) => setMessFeeAmount(e.target.value)}
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none h-9.5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(category === "roommates" || category === "startup") && (
+                  <div className="flex justify-between items-center border-t border-gray-100 pt-3">
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Recurring Monthly</label>
+                      <span className="text-[10px] text-muted-foreground">Reset stats and budget tracking monthly</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={recurringMonthly}
+                      onChange={(e) => setRecurringMonthly(e.target.checked)}
+                      className="rounded border-slate-300 text-primary focus:ring-primary size-4"
+                    />
+                  </div>
+                )}
+
+                {/* Members configuration block */}
+                <div className="border-t border-gray-150 pt-4 flex flex-col gap-3">
+                  <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold flex justify-between">
+                    <span>SELECT VERIFIED MEMBERS</span>
+                    <span className="text-primary font-bold">[ YOU ARE AUTOMATICALLY MEMBER ]</span>
+                  </label>
+
+                  {loadingFriends ? (
+                    <div className="flex py-4 justify-center">
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    </div>
+                  ) : friendsList.length === 0 ? (
+                    <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-700 flex flex-col gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                        <div className="flex flex-col gap-0.5 text-xs font-medium">
+                          <span className="font-bold uppercase font-mono">No Connections Verified</span>
+                          <span>Only mutually accepted friends are eligible to join sharing contexts. Connect with members first!</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFriends([]);
+                          setShowModal(false);
+                          navigate("/network");
+                        }}
+                        className="py-2 px-3 self-start rounded-lg text-[10px] font-mono font-bold uppercase bg-amber-600 text-white cursor-pointer"
+                      >
+                        [ GOTO CONNECTIONS CENTER ]
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
+                      {friendsList.map((f) => {
+                        const isSelected = selectedFriends.some((item) => item.uid === f.uid);
+                        return (
+                          <div
+                            key={f.uid}
+                            onClick={() => handleToggleFriend(f)}
+                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                              isSelected 
+                                ? "bg-primary/5 border-primary text-foreground font-semibold"
+                                : "bg-slate-50 border-slate-200 text-slate-800 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-mono text-xs overflow-hidden shrink-0">
+                                {f.photoURL ? (
+                                  <img src={f.photoURL} alt={f.name} referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span>{f.name[0]}</span>
+                                )}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-semibold leading-tight">{f.name} {f.surname || ""}</span>
+                                <span className="text-[10px] text-gray-400 font-mono leading-none mt-1">@{f.username}</span>
+                              </div>
+                            </div>
+
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                              isSelected 
+                                ? "bg-primary border-primary text-primary-foreground" 
+                                : "border-gray-300"
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCreationStep(1)}
+                    className="flex-1"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-primary text-primary-foreground"
+                  >
+                    Create Ledger
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

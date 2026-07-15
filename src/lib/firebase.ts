@@ -16,15 +16,15 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// User-provided Firebase project credentials (equaris-e462c)
+// User-provided Firebase project credentials (equaris-a2e02)
 const firebaseConfig = {
-  apiKey: "AIzaSyDxLpqniKqCHQnKM8xS02K9nRBGhL5DmWY",
-  authDomain: "equaris-e462c.firebaseapp.com",
-  projectId: "equaris-e462c",
-  storageBucket: "equaris-e462c.firebasestorage.app",
-  messagingSenderId: "767901784588",
-  appId: "1:767901784588:web:f2406c3ceb00f3600bac29",
-  measurementId: "G-R60GDEW2CR",
+  apiKey: "AIzaSyDrqW_zogLwI8khBjUvZ6HPr6sUzLXnwsA",
+  authDomain: "equaris-a2e02.firebaseapp.com",
+  projectId: "equaris-a2e02",
+  storageBucket: "equaris-a2e02.firebasestorage.app",
+  messagingSenderId: "187252919751",
+  appId: "1:187252919751:web:acb9ff085239ba3345dde2",
+  measurementId: "G-1Y58ZDTWR2",
 };
 
 // Initialize core Firebase App

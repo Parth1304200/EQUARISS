@@ -5,9 +5,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, where, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
-import { Group, Expense, Settlement, Activity, UserProfile } from "../types";
+import { Group, Expense, Settlement, Activity, UserProfile, Subscription } from "../types";
 import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
 
 interface RouteConfig {
@@ -25,6 +25,8 @@ interface AppContextType {
   setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
   /** Real expenses aggregated across every group the user belongs to. */
   allExpenses: Expense[];
+  subscriptions: Subscription[];
+  setSubscriptions: React.Dispatch<React.SetStateAction<Subscription[]>>;
   activeGroupId: string | null;
   setActiveGroupId: (id: string | null) => void;
   activeGroup: Group | null;
@@ -61,7 +63,14 @@ const deriveInitialRoute = (): RouteConfig => {
   if (path.startsWith("/groups/")) {
     return { path: "/groups/[id]", params: { id: path.split("/")[2] } };
   }
-  const known = ["/", "/dashboard", "/groups", "/settlements", "/network", "/reports", "/profile", "/settings", "/login", "/signup"];
+  if (path.startsWith("/subscriptions/")) {
+    const id = path.split("/")[2];
+    if (id === "new") {
+      return { path: "/subscriptions/new" };
+    }
+    return { path: "/subscriptions/[id]", params: { id } };
+  }
+  const known = ["/", "/dashboard", "/groups", "/subscriptions", "/subscriptions/new", "/subscriptions/[id]", "/money", "/settlements", "/network", "/reports", "/profile", "/settings", "/login", "/signup"];
   return known.includes(path) ? { path } : { path: "/" };
 };
 
@@ -73,6 +82,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentRoute, setCurrentRoute] = useState<RouteConfig>(initialRoute);
   const [groups, setGroups] = useState<Group[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(
     initialRoute.path === "/groups/[id]" ? initialRoute.params?.id ?? null : null
   );
@@ -99,6 +109,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const id = path.split("/")[2];
         setCurrentRoute({ path: "/groups/[id]", params: { id } });
         setActiveGroupId(id);
+      } else if (path.startsWith("/subscriptions/")) {
+        const id = path.split("/")[2];
+        if (id === "new") {
+          setCurrentRoute({ path: "/subscriptions/new", params: {} });
+        } else {
+          setCurrentRoute({ path: "/subscriptions/[id]", params: { id } });
+        }
       } else {
         setCurrentRoute({ path, params: {} });
       }
@@ -113,6 +130,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (path === "/groups/[id]" && params?.id) {
       url = `/groups/${params.id}`;
       setActiveGroupId(params.id);
+    } else if (path === "/subscriptions/[id]" && params?.id) {
+      url = `/subscriptions/${params.id}`;
     }
     window.history.pushState(null, "", url);
     setCurrentRoute({ path, params });
@@ -226,7 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // After sign-in + onboarding, honour a pending QR connect deep-link by routing
   // the user to the network page (where the connection is confirmed & written).
   useEffect(() => {
-    if (!user || !profile || profile.isOnboarded === false) return;
+    if (!user || !profile || !profile.isOnboarded) return;
     let pending: string | null = null;
     try {
       pending = localStorage.getItem("dispute_pending_connect");
@@ -263,6 +282,131 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => unsubscribe();
   }, [user]);
+
+  // Listen to SUBSCRIPTIONS list for authenticated user
+  useEffect(() => {
+    if (!user) {
+      setSubscriptions([]);
+      return;
+    }
+
+    const q = query(collection(db, "subscriptions"), where("ownerId", "==", user.uid));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const loadedSubs: Subscription[] = [];
+        snapshot.forEach((docSnap) => {
+          loadedSubs.push({ id: docSnap.id, ...docSnap.data() } as Subscription);
+        });
+        setSubscriptions(loadedSubs);
+      },
+      (error) => {
+        console.error("Subscriptions snap listener error:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const advanceRenewalDate = (dateStr: string, cycle: string, customDays?: number): string => {
+    const date = new Date(dateStr);
+    if (cycle === "weekly") {
+      date.setDate(date.getDate() + 7);
+    } else if (cycle === "monthly") {
+      date.setMonth(date.getMonth() + 1);
+    } else if (cycle === "quarterly") {
+      date.setMonth(date.getMonth() + 3);
+    } else if (cycle === "yearly") {
+      date.setFullYear(date.getFullYear() + 1);
+    } else if (cycle === "custom" && customDays) {
+      date.setDate(date.getDate() + customDays);
+    } else {
+      date.setMonth(date.getMonth() + 1);
+    }
+    return date.toISOString().split("T")[0];
+  };
+
+  // Local/simulated automated subscription renewals execution
+  useEffect(() => {
+    if (!user || subscriptions.length === 0 || groups.length === 0) return;
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const triggerSimulation = async () => {
+      for (const sub of subscriptions) {
+        if ((sub.status === "active" || sub.status === "trial") && sub.nextRenewalDate <= todayStr) {
+          try {
+            // Auto-log expense if enabled and contextId is set
+            if (sub.autoLogExpense && sub.contextId) {
+              const activeCtx = groups.find(g => g.id === sub.contextId);
+              if (activeCtx) {
+                const expId = `expense_sub_${Date.now()}`;
+                
+                // Build splits
+                let splitsData = [];
+                if (sub.splitType === "equal") {
+                  const share = sub.amount / activeCtx.members.length;
+                  splitsData = activeCtx.members.map(mId => ({
+                    uid: mId,
+                    amount: share,
+                    checked: true
+                  }));
+                } else if (sub.splitMembers) {
+                  splitsData = sub.splitMembers.map(m => ({
+                    uid: m.userId,
+                    amount: m.share,
+                    checked: true
+                  }));
+                }
+
+                const expensePayload = {
+                  id: expId,
+                  groupId: sub.contextId,
+                  title: `${sub.name} Renewal`,
+                  amount: sub.amount,
+                  paidBy: sub.ownerId,
+                  category: sub.category.toLowerCase(),
+                  date: sub.nextRenewalDate,
+                  splitType: sub.splitType === "equal" ? "equal" : "exact",
+                  splits: splitsData,
+                  createdAt: new Date().toISOString(),
+                  source: "subscription",
+                  subscriptionId: sub.id
+                };
+
+                // Save expense under group's subcollection
+                await dbSetDoc(`groups/${sub.contextId}/expenses`, expId, expensePayload);
+
+                // Add activity
+                const actId = `act_sub_${Date.now()}`;
+                await dbSetDoc(`groups/${sub.contextId}/activities`, actId, {
+                  id: actId,
+                  groupId: sub.contextId,
+                  category: "expense_added",
+                  message: `Subscription "${sub.name}" auto-renewed and logged ₹${sub.amount}.`,
+                  actorId: sub.ownerId,
+                  createdAt: new Date().toISOString()
+                });
+              }
+            }
+
+            // Calculate next renewal date
+            const nextDate = advanceRenewalDate(sub.nextRenewalDate, sub.billingCycle, sub.customCycleDays);
+            
+            // Update subscription doc in Firestore
+            await updateDoc(doc(db, "subscriptions", sub.id), {
+              nextRenewalDate: nextDate,
+              lastChargedDate: sub.nextRenewalDate
+            });
+
+          } catch (err) {
+            console.error("Simulation run error for subscription:", sub.id, err);
+          }
+        }
+      }
+    };
+
+    triggerSimulation();
+  }, [user, subscriptions, groups]);
 
   // Aggregate expenses across ALL of the user's groups so global views
   // (Dashboard, Reports, Settlements) render from real data instead of mocks.
@@ -371,6 +515,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         groups,
         setGroups,
         allExpenses,
+        subscriptions,
+        setSubscriptions,
         activeGroupId,
         setActiveGroupId,
         activeGroup,

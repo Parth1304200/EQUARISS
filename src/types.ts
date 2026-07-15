@@ -44,6 +44,8 @@ export interface Expense {
   splitType: "equal" | "percentage" | "exact";
   splits: Split[];
   createdAt: string; // ISO or Timestamp helper
+  source?: "manual" | "ocr" | "subscription"; // New
+  subscriptionId?: string; // New
 }
 
 export interface Settlement {
@@ -77,8 +79,44 @@ export interface Group {
   createdBy: string;
   members: string[]; // List of UIDs
   memberNames: Record<string, string>; // offline fast lookups
-  budget?: number;
+  budget?: number; // legacy budget cap
   createdAt: string;
+  type?: "trip" | "roommates" | "student" | "startup" | "group"; // New
+  currency?: string; // New, e.g., 'INR'
+  archivedAt?: string | null; // New
+  budgetConfig?: {
+    totalCap?: number;
+    perCategoryCaps?: Record<string, number>;
+    perDayCap?: number;
+    periodStart?: string;
+    periodEnd?: string;
+    recurring?: boolean;
+  }; // New
+  defaultCategories?: string[]; // New
+}
+
+export interface Subscription {
+  id: string;
+  ownerId: string;
+  contextId?: string; // empty means solo subscription
+  name: string;
+  provider?: string;
+  amount: number;
+  currency: string;
+  billingCycle: "weekly" | "monthly" | "quarterly" | "yearly" | "custom";
+  customCycleDays?: number;
+  nextRenewalDate: string; // YYYY-MM-DD
+  lastChargedDate?: string; // YYYY-MM-DD
+  splitType: "solo" | "equal" | "weighted" | "exact";
+  splitMembers?: Array<{ userId: string; share: number }>; // share is direct amount or weights
+  category: "OTT" | "Music" | "Software" | "Cloud/Storage" | "Utilities" | "Fitness" | "News/Reading" | "Other";
+  status: "active" | "paused" | "cancelled" | "trial";
+  trialEndsAt?: string; // YYYY-MM-DD
+  reminderDaysBefore: number;
+  autoLogExpense: boolean;
+  createdAt: string;
+  cancelledAt?: string;
+  notes?: string;
 }
 
 export interface BudgetConfig {
