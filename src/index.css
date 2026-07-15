@@ -1,7 +1,7 @@
 /* Typography: Inter Variable (UI + headings) self-hosted; JetBrains Mono for
    numeric / ledger accents. */
-@import "@fontsource-variable/inter";
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "@fontsource-variable/inter";
 
 @import "tailwindcss";
 @import "tw-animate-css";

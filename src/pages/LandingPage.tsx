@@ -180,10 +180,10 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
       {/* HERO */}
       <main className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 pb-8 pt-8 lg:grid-cols-2">
         {/* Left */}
-        <div className="flex flex-col gap-7">
+        <div className="flex flex-col gap-7 items-center text-center lg:items-start lg:text-left">
           <h1 className="font-heading text-6xl font-bold leading-[1.05] tracking-tight">Share. Split. Settle.</h1>
 
-          <img src={handshakeImg} alt="Handshake split agreement" className="h-36 w-auto self-start object-contain animate-fade-in" />
+          <img src={handshakeImg} alt="Handshake split agreement" className="h-36 w-auto lg:self-start object-contain animate-fade-in" />
 
           <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
             Expense management for nuanced splits with your partners, roommates, travel mates, or anyone else.
@@ -195,7 +195,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
           </Button>
 
           {/* category chips */}
-          <div className="mt-2 flex flex-wrap gap-6">
+          <div className="mt-2 flex flex-wrap justify-center lg:justify-start gap-6">
             {CATEGORIES.map(({ icon: Icon, label }) => (
               <div key={label} className="flex flex-col items-center gap-2">
                 <span className="flex size-14 items-center justify-center rounded-full bg-secondary text-primary">
