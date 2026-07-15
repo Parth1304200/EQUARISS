@@ -58,7 +58,7 @@ function getGeminiClient(): GoogleGenAI {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Middleware for body parsing
   app.use(express.json({ limit: "15mb" }));
@@ -141,7 +141,7 @@ async function startServer() {
 Group overall budget is ₹${budget || 0}.
 The group members are: ${JSON.stringify(memberNames || {})}.
 Here is the JSON of logged transactions: ${JSON.stringify(expenses || [])}.
-Generate exactly 3 insights/tips. Keep them short (1-2 sentences), stylish, using modern Gen Z premium slang (clean, e.g. "Goa plans are eating up budget", "Chai spend looking suspicious"). Format as an array of structured JSON.`;
+Generate exactly 3 insights/tips. Keep them short (1-2 sentences), stylish, using modern Gen Z premium slang (clean, e.g. "Goa plans are eating up budget", "Chai spend looking suspicious"). Format as an array of structured JSON. Do NOT include any emojis in the title or message fields under any circumstances.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",

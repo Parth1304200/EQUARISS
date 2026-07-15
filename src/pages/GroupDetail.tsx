@@ -9,6 +9,19 @@ import { dbSetDoc, dbAddDoc, dbDeleteDoc, dbUpdateDoc, dbGetDoc } from "../lib/f
 import { calculateBalances, generateSettlementSuggestions } from "../lib/settleEngine";
 import { SettleProofModal } from "../components/SettleProofModal";
 import QRCode from "qrcode";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Users, 
   Plus, 
@@ -34,7 +47,8 @@ import {
   faScaleBalanced,
   faLightbulb,
   faCamera,
-  faClock
+  faClock,
+  faHome
 } from "@fortawesome/free-solid-svg-icons";
 
 export const GroupDetail: React.FC = () => {
@@ -49,7 +63,17 @@ export const GroupDetail: React.FC = () => {
     refetchActiveGroupData
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "receipts" | "timeline">("expenses");
+  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "receipts" | "timeline" | "roommate">("expenses");
+
+  // Roommate rent splitter states
+  const [roommateRent, setRoommateRent] = useState("");
+  const [roommateSizes, setRoommateSizes] = useState<Record<string, string>>({}); // uid -> sq ft
+  const [calculatedRentShares, setCalculatedRentShares] = useState<Record<string, number>>({});
+  
+  // Roommate utilities states
+  const [utilityAmount, setUtilityAmount] = useState("");
+  const [utilityType, setUtilityType] = useState<"electricity" | "internet" | "water" | "groceries">("electricity");
+  const [utilityPaidBy, setUtilityPaidBy] = useState("");
 
   // QR Code payment modal state
   const [showPayModal, setShowPayModal] = useState(false);
@@ -68,11 +92,16 @@ export const GroupDetail: React.FC = () => {
   const [expNotes, setExpNotes] = useState("");
   const [expSplitType, setExpSplitType] = useState<"equal" | "percentage" | "exact">("equal");
   const [customSplits, setCustomSplits] = useState<Record<string, string>>({}); // uid -> custom amount
+  
+  // Group-specific AI insights state
+  const [groupInsights, setGroupInsights] = useState<{ type: string; title: string; message: string }[]>([]);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   // OCR Receipt scan state
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   // PDF statement generator trigger
   const handlePrintStatement = () => {
@@ -87,8 +116,13 @@ export const GroupDetail: React.FC = () => {
   }, [activeGroup, user]);
 
   // Compute live local balances
-  const liveBalances = activeGroup ? calculateBalances(activeGroup.members, activeGroupExpenses) : {};
+  const liveBalances = activeGroup ? calculateBalances(activeGroup.members, activeGroupExpenses || []) : {};
   const liveSuggestions = activeGroup ? generateSettlementSuggestions(activeGroup.id, liveBalances) : [];
+
+  // Compute stats: Total Spent sum inside activeGroupExpenses (filtering out settlements)
+  const expensesOnly = (activeGroupExpenses || []).filter((e) => e.category !== "settlement");
+  const overallActiveSpent = expensesOnly.reduce((sum, e) => sum + e.amount, 0);
+  const budgetRatio = (activeGroup && activeGroup.budget) ? (overallActiveSpent / activeGroup.budget) * 100 : 0;
 
   // Resolve a recipient's real UPI id (own profile, or fetched from their user doc).
   const resolveRecipientUpi = async (recipientUid: string): Promise<string> => {
@@ -106,6 +140,186 @@ export const GroupDetail: React.FC = () => {
     const upiId = customUpiId.trim();
     const name = activeGroup?.memberNames[recipientUid] || "GroupRepay";
     return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Settle on Dispute - ${activeGroup?.name || ""}`)}`;
+  };
+
+  const handleEndTripConfirmed = async () => {
+    setShowEndConfirm(false);
+    if (!activeGroup || !user || !profile) return;
+    try {
+      await dbUpdateDoc("groups", activeGroup.id, { status: "ended" });
+      const activityId = `act_${Date.now()}`;
+      await dbSetDoc(`groups/${activeGroup.id}/activities`, activityId, {
+        id: activityId,
+        groupId: activeGroup.id,
+        category: "trip_ended",
+        message: `${profile.name} ended the trip "${activeGroup.name}". Balances are closed.`,
+        actorId: user.uid,
+        createdAt: new Date().toISOString()
+      });
+      refetchActiveGroupData();
+    } catch (err) {
+      console.error("Failed to end the trip:", err);
+    }
+  };
+
+  const fetchGroupInsights = async () => {
+    if (!activeGroup || expensesOnly.length === 0) return;
+    setLoadingInsights(true);
+    try {
+      const res = await fetch("/api/gemini/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenses: expensesOnly.map(e => ({ title: e.title, amount: e.amount, category: e.category })),
+          budget: activeGroup.budget || 0,
+          memberNames: activeGroup.memberNames
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGroupInsights(data);
+      }
+    } catch (err) {
+      console.error("Failed to load group insights:", err);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeGroup && expensesOnly.length > 0) {
+      fetchGroupInsights();
+    } else {
+      setGroupInsights([]);
+    }
+  }, [activeGroup?.id, expensesOnly.length]);
+
+  const handleCalculateRent = () => {
+    const rentVal = parseFloat(roommateRent);
+    if (isNaN(rentVal) || rentVal <= 0) return;
+
+    let totalArea = 0;
+    activeGroup?.members.forEach((m) => {
+      totalArea += parseFloat(roommateSizes[m]) || 0;
+    });
+
+    if (totalArea <= 0) {
+      const numMembers = activeGroup?.members.length || 1;
+      const equalShare = Math.round((rentVal / numMembers) * 100) / 100;
+      const shares: Record<string, number> = {};
+      activeGroup?.members.forEach((m) => {
+        shares[m] = equalShare;
+      });
+      setCalculatedRentShares(shares);
+      return;
+    }
+
+    const shares: Record<string, number> = {};
+    activeGroup?.members.forEach((m) => {
+      const area = parseFloat(roommateSizes[m]) || 0;
+      shares[m] = Math.round((rentVal * (area / totalArea)) * 100) / 100;
+    });
+    setCalculatedRentShares(shares);
+  };
+
+  const handleLogRentExpense = async () => {
+    if (!activeGroup || !user || !profile) return;
+    const rentVal = parseFloat(roommateRent);
+    if (isNaN(rentVal) || rentVal <= 0) return;
+
+    const sharesToLog = Object.keys(calculatedRentShares).length > 0 ? calculatedRentShares : (() => {
+      const numMembers = activeGroup.members.length;
+      const equalShare = Math.round((rentVal / numMembers) * 100) / 100;
+      const shares: Record<string, number> = {};
+      activeGroup.members.forEach((m) => {
+        shares[m] = equalShare;
+      });
+      return shares;
+    })();
+
+    const splitsList = activeGroup.members.map((m) => ({
+      uid: m,
+      amount: sharesToLog[m] || 0
+    }));
+
+    const expenseId = `exp_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/expenses`, expenseId, {
+      id: expenseId,
+      groupId: activeGroup.id,
+      title: "Rent Split",
+      amount: rentVal,
+      paidBy: user.uid,
+      category: "rent",
+      date: new Date().toISOString().substring(0, 10),
+      notes: "Proportional rent split by room size",
+      splitType: "custom",
+      splits: splitsList,
+      createdAt: new Date().toISOString()
+    });
+
+    const actId = `act_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
+      id: actId,
+      groupId: activeGroup.id,
+      category: "expense_added",
+      message: `${profile.name} logged Rent expense of ₹${rentVal.toLocaleString("en-IN")} split proportionally.`,
+      actorId: user.uid,
+      createdAt: new Date().toISOString()
+    });
+
+    setRoommateRent("");
+    setCalculatedRentShares({});
+    setActiveTab("expenses");
+  };
+
+  const handleLogUtilityExpense = async () => {
+    if (!activeGroup || !user || !profile) return;
+    const utilVal = parseFloat(utilityAmount);
+    if (isNaN(utilVal) || utilVal <= 0) return;
+
+    const numMembers = activeGroup.members.length;
+    const share = Math.round((utilVal / numMembers) * 100) / 100;
+    const splitsList = activeGroup.members.map((m) => ({
+      uid: m,
+      amount: share
+    }));
+
+    const payer = utilityPaidBy || user.uid;
+    const utilityLabels: Record<string, string> = {
+      electricity: "Electricity Bill",
+      internet: "WiFi & Internet",
+      water: "Water Bill",
+      groceries: "Groceries Split"
+    };
+
+    const expenseId = `exp_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/expenses`, expenseId, {
+      id: expenseId,
+      groupId: activeGroup.id,
+      title: utilityLabels[utilityType] || "Utility Bill",
+      amount: utilVal,
+      paidBy: payer,
+      category: utilityType === "groceries" ? "food" : "rent",
+      date: new Date().toISOString().substring(0, 10),
+      notes: `${utilityLabels[utilityType] || "Utility"} split equally`,
+      splitType: "equal",
+      splits: splitsList,
+      createdAt: new Date().toISOString()
+    });
+
+    const payerName = activeGroup.memberNames[payer] || "Someone";
+    const actId = `act_${Date.now()}`;
+    await dbSetDoc(`groups/${activeGroup.id}/activities`, actId, {
+      id: actId,
+      groupId: activeGroup.id,
+      category: "expense_added",
+      message: `${payerName} logged ${utilityLabels[utilityType] || "Utility"} of ₹${utilVal.toLocaleString("en-IN")}.`,
+      actorId: user.uid,
+      createdAt: new Date().toISOString()
+    });
+
+    setUtilityAmount("");
+    setActiveTab("expenses");
   };
 
   // Draw QR code whenever pay modal is opened and a UPI id is available
@@ -324,41 +538,58 @@ export const GroupDetail: React.FC = () => {
     );
   }
 
-  // Compute stats: Total Spent sum inside activeGroupExpenses (filtering out settlements)
-  const expensesOnly = activeGroupExpenses.filter((e) => e.category !== "settlement");
-  const overallActiveSpent = expensesOnly.reduce((sum, e) => sum + e.amount, 0);
-  const budgetRatio = activeGroup.budget ? (overallActiveSpent / activeGroup.budget) * 100 : 0;
+
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 sm:px-12 py-10 flex flex-col gap-10">
       
       {/* Editorial Group Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-gray-100 pb-8">
-        <div className="flex flex-col gap-2">
+      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
+        <div className="flex flex-col gap-3">
           <button 
             onClick={() => navigate("/groups")}
-            className="text-xs font-mono font-bold tracking-widest text-[#9CA3AF] uppercase hover:text-black hover:underline cursor-pointer flex items-center gap-0.5"
+            className="text-xs font-mono font-bold tracking-widest text-muted-foreground uppercase hover:text-primary hover:underline cursor-pointer flex items-center gap-1 transition-colors"
           >
             ❮ All Groups
           </button>
-          <h1 className="font-sans font-black text-3.5xl tracking-tight text-gray-900 leading-tight flex items-center gap-3">
-            {activeGroup.name}
-          </h1>
-          <p className="text-sm text-gray-500 max-w-md">
-            {activeGroup.description || "Track shared group bills and peer settled accounts cleanly."}
-          </p>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-3">
+              <h1 className="font-sans font-black text-3xl md:text-4xl tracking-tight text-foreground leading-tight">
+                {activeGroup.name}
+              </h1>
+              {activeGroup.status === "ended" ? (
+                <span className="text-[10px] px-2.5 py-1 bg-red-100 dark:bg-red-950/40 text-red-800 dark:text-red-300 rounded-full font-bold uppercase font-mono tracking-wider">Ended</span>
+              ) : (
+                <span className="text-[10px] px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-full font-bold uppercase font-mono tracking-wider">Active</span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+              {activeGroup.description || "Track shared group bills and peer settled accounts cleanly."}
+            </p>
+            {activeGroup.status !== "ended" && (
+              <div className="mt-1 flex gap-2">
+                <Button 
+                  onClick={() => setShowEndConfirm(true)} 
+                  variant="outline" 
+                  className="border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/10 cursor-pointer text-[10px] h-7 px-2.5 rounded-lg font-bold font-mono tracking-wider uppercase"
+                >
+                  End Trip
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Members avatars bar & budget remaining */}
-        <div className="flex flex-col gap-3 min-w-[200px] w-full md:w-auto">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-400 font-semibold uppercase font-mono mr-1">Members:</span>
-            <div className="flex -space-x-2.5 overflow-hidden">
+        <div className="flex flex-col sm:flex-row md:flex-col gap-4 min-w-[240px] w-full md:w-auto shrink-0 bg-background/40 border border-border/50 rounded-xl p-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase font-mono tracking-wider">Members ({activeGroup.members.length})</span>
+            <div className="flex -space-x-1.5 overflow-hidden">
               {activeGroup.members.map((memberId) => (
                 <div 
                   key={memberId} 
                   title={activeGroup.memberNames[memberId]}
-                  className="w-7.5 h-7.5 rounded-full border border-white bg-gray-150 flex items-center justify-center text-[10px] font-bold text-gray-700"
+                  className="w-7.5 h-7.5 rounded-full border border-background bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground shadow-3xs"
                 >
                   {activeGroup.memberNames[memberId]?.[0] || "M"}
                 </div>
@@ -367,28 +598,80 @@ export const GroupDetail: React.FC = () => {
           </div>
 
           {activeGroup.budget && (
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] font-mono text-gray-500 font-semibold uppercase">
+            <div className="flex flex-col gap-2 border-t border-border/40 pt-3 sm:border-t-0 sm:pt-0 md:border-t md:pt-3 flex-1">
+              <div className="flex justify-between items-center text-[10px] font-mono text-muted-foreground font-semibold uppercase tracking-wider">
                 <span>Budget Spent: {Math.round(budgetRatio)}%</span>
-                <span>₹{overallActiveSpent.toLocaleString("en-IN")} / ₹{activeGroup.budget.toLocaleString("en-IN")}</span>
+                <span className={budgetRatio > 100 ? "text-destructive font-bold" : "text-foreground"}>
+                  ₹{overallActiveSpent.toLocaleString("en-IN")} / ₹{activeGroup.budget.toLocaleString("en-IN")}
+                </span>
               </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border/50">
                 <div 
-                  className={`h-full rounded-full transition-all duration-500 ${budgetRatio > 90 ? "bg-red-500" : budgetRatio > 70 ? "bg-amber-400" : "bg-black"}`} 
+                  className={`h-full rounded-full transition-all duration-500 ${budgetRatio > 100 ? "bg-destructive" : budgetRatio > 70 ? "bg-amber-500" : "bg-success"}`} 
                   style={{ width: `${Math.min(100, budgetRatio)}%` }}
                 ></div>
               </div>
+              {budgetRatio > 100 && (
+                <span className="text-[9px] font-mono font-bold text-destructive uppercase tracking-widest mt-0.5 animate-pulse text-right">
+                  ⚠️ Over Budget Limit
+                </span>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Dynamic page subtabs */}
+      {/* Group Detail Mini Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+          <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Group Total Spend</span>
+          <div className="text-2xl font-semibold tracking-tight text-foreground">
+            ₹{overallActiveSpent.toLocaleString("en-IN")}
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+          <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">You Owe</span>
+          <div className="text-2xl font-semibold tracking-tight text-destructive">
+            {(liveBalances[user?.uid || ""] || 0) < -0.01 
+              ? `₹${Math.abs(Math.round(liveBalances[user?.uid || ""] || 0)).toLocaleString("en-IN")}` 
+              : "₹0"}
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+          <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Owed to You</span>
+          <div className="text-2xl font-semibold tracking-tight text-emerald-600">
+            {(liveBalances[user?.uid || ""] || 0) > 0.01 
+              ? `₹${Math.round(liveBalances[user?.uid || ""] || 0).toLocaleString("en-IN")}` 
+              : "₹0"}
+          </div>
+        </div>
+      </div>
+
+      {/* Group Specific AI Insights Panel */}
+      {groupInsights.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-xs">
+          <h3 className="font-heading text-sm font-semibold tracking-tight flex items-center gap-1.5 text-primary">
+            AI Group Insights
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1">
+            {groupInsights.map((insight, idx) => (
+              <div key={idx} className="bg-background/40 border border-border/50 rounded-xl p-3 flex flex-col gap-1">
+                <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase tracking-wider">{insight.title}</span>
+                <p className="text-xs text-foreground leading-relaxed">{insight.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 border-b border-gray-100 pb-px overflow-x-auto whitespace-nowrap">
         {[
           { key: "expenses", label: "Group Expenses Logs", count: expensesOnly.length, faIcon: faFileLines },
           { key: "balances", label: "Peers Balances", count: null, faIcon: faScaleBalanced },
           { key: "suggest", label: "Smart Settlement Recommendations", count: liveSuggestions.length, faIcon: faLightbulb },
+          ...(activeGroup.category === "roommates" ? [{ key: "roommate", label: "Rent & Utilities Splitter", count: null, faIcon: faHome }] : []),
           { key: "receipts", label: "Scan Bills (AI Vision OCR)", count: null, faIcon: faCamera },
           { key: "timeline", label: "Activity Audit Log", count: activeGroupActivities.length, faIcon: faClock }
         ].map((tab) => (
@@ -443,7 +726,7 @@ export const GroupDetail: React.FC = () => {
 
             {/* Slide-down add manual expense container form */}
             {showAddExpense && (
-              <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-3xs flex flex-col gap-5 md:max-w-2xl">
+              <div className="mx-auto w-full bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-3xs flex flex-col gap-5 md:max-w-2xl">
                 <h4 className="text-sm font-black text-gray-900 flex items-center justify-between">
                   <span>Logged Expense Information</span>
                   <button 
@@ -509,11 +792,11 @@ export const GroupDetail: React.FC = () => {
                       onChange={(e) => setExpCategory(e.target.value)}
                       className="py-2 px-2.5 border border-gray-200 rounded-lg focus:border-black outline-hidden bg-white text-xs h-9"
                     >
-                      <option value="food">Food & Dining 🍛</option>
-                      <option value="rent">Rent / Accommodations 🏠</option>
-                      <option value="travel">Transport & Fuel ⛽</option>
-                      <option value="entertainment">Activities / Tickets 🎟️</option>
-                      <option value="others">Others / Sundry bills 💼</option>
+                      <option value="food">Food & Dining</option>
+                      <option value="rent">Rent / Accommodations</option>
+                      <option value="travel">Transport & Fuel</option>
+                      <option value="entertainment">Activities / Tickets</option>
+                      <option value="others">Others / Sundry bills</option>
                     </select>
                   </div>
 
@@ -566,11 +849,11 @@ export const GroupDetail: React.FC = () => {
                     <div className="flex items-center gap-4">
                       {/* Avatar initials category mapping */}
                       <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-base">
-                        {exp.category === "food" && "🍛"}
-                        {exp.category === "rent" && "🏠"}
-                        {exp.category === "travel" && "⛽"}
-                        {exp.category === "entertainment" && "🎟️"}
-                        {exp.category === "others" && "💼"}
+                        {exp.category === "food" && "F"}
+                        {exp.category === "rent" && "R"}
+                        {exp.category === "travel" && "T"}
+                        {exp.category === "entertainment" && "E"}
+                        {exp.category === "others" && "O"}
                       </div>
 
                       <div className="flex flex-col gap-0.5">
@@ -792,6 +1075,152 @@ export const GroupDetail: React.FC = () => {
           </div>
         )}
 
+        {/* TAB ROOMMATE: Rent & Utility Splitter */}
+        {activeTab === "roommate" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Rent Splitter Panel */}
+            <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-5 shadow-sm">
+              <div>
+                <h3 className="font-sans font-bold text-gray-900 text-lg flex items-center gap-2">
+                  🏠 Roommate Rent Splitter
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Split rent proportionally based on individual room size (square footage) or custom weight ratios.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4 border-t border-border/40 pt-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="roommate-rent" className="text-xs font-semibold">Total Rent Amount (₹)</Label>
+                  <Input
+                    id="roommate-rent"
+                    type="number"
+                    placeholder="e.g. 45000"
+                    value={roommateRent}
+                    onChange={(e) => setRoommateRent(e.target.value)}
+                    className="text-xs h-9.5 rounded-xl border-border bg-background/50"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold">Room Size / Area (sq ft)</span>
+                  {activeGroup.members.map((m) => (
+                    <div key={m} className="flex items-center justify-between gap-4">
+                      <span className="text-xs text-gray-700 font-medium">{activeGroup.memberNames[m] || "Roommate"}</span>
+                      <div className="relative w-32">
+                        <Input
+                          type="number"
+                          placeholder="sq ft"
+                          value={roommateSizes[m] || ""}
+                          onChange={(e) => setRoommateSizes({ ...roommateSizes, [m]: e.target.value })}
+                          className="text-xs h-8 pr-10 rounded-lg border-border bg-background/50 text-right"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 font-mono">sqft</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    onClick={handleCalculateRent}
+                    className="flex-1 text-xs h-9 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl"
+                  >
+                    Calculate Split
+                  </Button>
+                </div>
+
+                {Object.keys(calculatedRentShares).length > 0 && (
+                  <div className="bg-background/60 border border-border/50 rounded-xl p-4 flex flex-col gap-3 mt-2">
+                    <span className="text-xs font-bold text-gray-900">Computed Shares:</span>
+                    <div className="flex flex-col gap-1.5 text-xs">
+                      {activeGroup.members.map((m) => (
+                        <div key={m} className="flex justify-between font-mono">
+                          <span>{activeGroup.memberNames[m] || "Roommate"}:</span>
+                          <span className="font-bold">₹{calculatedRentShares[m]?.toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={handleLogRentExpense}
+                      variant="outline"
+                      className="mt-2 text-xs h-8 border-primary/30 text-primary hover:bg-primary/5 rounded-lg"
+                    >
+                      Log Rent as Group Expense
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Utility Quick Splitter Panel */}
+            <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-5 shadow-sm">
+              <div>
+                <h3 className="font-sans font-bold text-gray-900 text-lg flex items-center gap-2">
+                  Utility Quick Splitter
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Log monthly utilities (Electricity, Internet, Water, Groceries) divided equally with one click.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4 border-t border-border/40 pt-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="utility-type" className="text-xs font-semibold">Utility Bill Type</Label>
+                  <select
+                    id="utility-type"
+                    value={utilityType}
+                    onChange={(e: any) => setUtilityType(e.target.value)}
+                    className="text-xs h-9.5 px-3 rounded-xl border border-border bg-background/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="electricity">Electricity Bill</option>
+                    <option value="internet">WiFi & Internet</option>
+                    <option value="water">Water Bill</option>
+                    <option value="groceries">Groceries Split</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="utility-amount" className="text-xs font-semibold">Bill Amount (₹)</Label>
+                  <Input
+                    id="utility-amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={utilityAmount}
+                    onChange={(e) => setUtilityAmount(e.target.value)}
+                    className="text-xs h-9.5 rounded-xl border-border bg-background/50"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="utility-payer" className="text-xs font-semibold">Who Paid the Bill?</Label>
+                  <select
+                    id="utility-payer"
+                    value={utilityPaidBy}
+                    onChange={(e) => setUtilityPaidBy(e.target.value)}
+                    className="text-xs h-9.5 px-3 rounded-xl border border-border bg-background/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Choose Payer...</option>
+                    {activeGroup.members.map((m) => (
+                      <option key={m} value={m}>{activeGroup.memberNames[m] || "Roommate"}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Button
+                  onClick={handleLogUtilityExpense}
+                  disabled={!utilityAmount || parseFloat(utilityAmount) <= 0}
+                  className="mt-2 text-xs h-9 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl disabled:opacity-40"
+                >
+                  Log Split Equally
+                </Button>
+              </div>
+            </div>
+            
+          </div>
+        )}
+
         {/* TAB 5: Activity Feed timeline */}
         {activeTab === "timeline" && (
           <div className="flex flex-col gap-6 max-w-xl">
@@ -805,9 +1234,9 @@ export const GroupDetail: React.FC = () => {
                 <div key={act.id} className="relative">
                   {/* Dot symbol */}
                   <div className="absolute -left-10 top-1.5 w-8 h-8 rounded-full bg-white border border-gray-150 flex items-center justify-center font-bold text-base shadow-3xs">
-                    {act.category === "group_created" && "🌊"}
-                    {act.category === "expense_added" && "🍛"}
-                    {act.category === "settlement_marked" && "⚡"}
+                    {act.category === "group_created" && "G"}
+                    {act.category === "expense_added" && "+"}
+                    {act.category === "settlement_marked" && "S"}
                   </div>
                   <div className="flex flex-col gap-1 pl-1">
                     <p className="text-gray-800 font-medium leading-relaxed">{act.message}</p>
@@ -937,6 +1366,29 @@ export const GroupDetail: React.FC = () => {
           setProofFor(null);
         }}
       />
+
+      {/* END TRIP CONFIRMATION ALERT DIALOG */}
+      <AlertDialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>End this trip permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All active balances will be locked and this group will be stored as archived/ended.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline" size="default" className="cursor-pointer rounded-xl text-xs h-9.5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEndTripConfirmed}
+              className="cursor-pointer rounded-xl text-xs h-9.5 bg-destructive text-white hover:bg-destructive/90"
+            >
+              End Trip
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

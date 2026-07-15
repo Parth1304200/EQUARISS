@@ -32,6 +32,7 @@ export const Groups: React.FC = () => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
+  const [category, setCategory] = useState("trip");
   
   // Real friends list state
   const [friendsList, setFriendsList] = useState<any[]>([]);
@@ -101,7 +102,9 @@ export const Groups: React.FC = () => {
         createdBy: user.uid,
         members: memberUids,
         memberNames: namesRecord,
-        budget: Number(budget) || 25000,
+        budget: budget.trim() ? Number(budget) : null,
+        category: category,
+        status: "active",
         createdAt: new Date().toISOString()
       };
 
@@ -192,7 +195,7 @@ export const Groups: React.FC = () => {
                 {g.members.length} MEMBERS
               </span>
               <span className="text-gray-400 font-bold flex items-center font-mono">
-                ₹{g.budget?.toLocaleString("en-IN") || "0"} SPEND LIMIT
+                {g.budget ? `₹${g.budget.toLocaleString("en-IN")} LIMIT` : "NO LIMIT"}
               </span>
             </div>
           </div>
@@ -237,7 +240,7 @@ export const Groups: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Goa Trip 🌊, Flatmates 2B, Weekend Chai"
+                  placeholder="e.g. Goa Trip, Flatmates 2B, Weekend Chai"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={`w-full text-xs py-3 px-4 rounded-xl border focus:outline-none transition-all ${
@@ -260,6 +263,24 @@ export const Groups: React.FC = () => {
                       : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
                   }`}
                 />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono tracking-widest uppercase text-gray-400 font-bold">Group Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className={`w-full text-xs py-2 px-3 rounded-xl border focus:outline-none transition-all h-9.5 ${
+                    theme === "dark" 
+                      ? "bg-slate-950/60 border-white/10 focus:border-cyan-500 text-white" 
+                      : "bg-slate-50 border-slate-200 focus:border-black text-slate-800"
+                  }`}
+                >
+                  <option value="trip">Trip / Travel</option>
+                  <option value="roommates">Roommates / Flatmates</option>
+                  <option value="couple">Couple / Partner</option>
+                  <option value="others">Others</option>
+                </select>
               </div>
 
               <div className="flex flex-col gap-1.5">

@@ -15,6 +15,7 @@ import { Settings } from "./pages/Settings";
 import { LandingPage } from "./pages/LandingPage";
 import { Onboarding } from "./components/Onboarding";
 import { AssistantChat } from "./components/AssistantChat";
+import { LoginPage } from "./pages/LoginPage";
 import { NetworkHub } from "./pages/NetworkHub";
 import { Profile } from "./pages/Profile";
 import { Loader2 } from "lucide-react";
@@ -37,6 +38,9 @@ const MainRouter: React.FC = () => {
 
   // Prevent accessing protected views if not logged in
   if (!user) {
+    if (currentRoute.path === "/login" || currentRoute.path === "/signup") {
+      return <LoginPage mode={currentRoute.path === "/login" ? "signin" : "signup"} />;
+    }
     return <LandingPage />;
   }
 
@@ -50,8 +54,7 @@ const MainRouter: React.FC = () => {
       <Navbar />
 
       <main className="min-h-screen flex-1 px-4 py-6 pb-16 md:h-screen md:overflow-y-auto md:px-8 md:pb-0">
-        {currentRoute.path === "/login" && <LandingPage />}
-        {currentRoute.path === "/dashboard" && <Dashboard />}
+        {(currentRoute.path === "/" || currentRoute.path === "/dashboard" || currentRoute.path === "/login" || currentRoute.path === "/signup") && <Dashboard />}
         {currentRoute.path === "/groups" && <Groups />}
         {currentRoute.path === "/groups/[id]" && <GroupDetail />}
         {currentRoute.path === "/settlements" && <Settlements />}

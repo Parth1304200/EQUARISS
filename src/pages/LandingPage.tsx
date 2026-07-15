@@ -30,7 +30,8 @@ import {
   Youtube,
 } from "lucide-react";
 import { EquarisLogo } from "../components/EquarisLogo";
-import heroIllustration from "@/assets/hero.png";
+import heroVideo from "@/assets/ARTT.mp4";
+import handshakeImg from "@/assets/handshake.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,7 +153,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
       {/* NAV */}
       <header id="top" className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <button onClick={() => scrollTo("top")} className="flex cursor-pointer items-center gap-2.5 text-primary outline-none">
-          <EquarisLogo className="h-8 w-auto" />
+          <EquarisLogo className="h-12 w-auto" />
           <span className="font-heading text-2xl font-bold tracking-tight">EQUARIS</span>
         </button>
 
@@ -166,12 +167,12 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
               {l.label}
             </Button>
           ))}
-          <Button variant="ghost" onClick={() => openAuth("signin")} className="cursor-pointer text-foreground/80 hover:text-foreground">
+          <Button variant="ghost" onClick={() => navigate("/login")} className="cursor-pointer text-foreground/80 hover:text-foreground">
             Log in
           </Button>
         </nav>
 
-        <Button onClick={() => openAuth("signup")} className="cursor-pointer rounded-full px-5">
+        <Button onClick={() => navigate("/signup")} className="cursor-pointer rounded-full px-5">
           Get for free
         </Button>
       </header>
@@ -180,16 +181,15 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
       <main className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 pb-8 pt-8 lg:grid-cols-2">
         {/* Left */}
         <div className="flex flex-col gap-7">
-          <EquarisLogo className="h-12 w-auto text-primary" />
+          <h1 className="font-heading text-6xl font-bold leading-[1.05] tracking-tight">Share. Split. Settle.</h1>
 
-          <div className="flex flex-col gap-4">
-            <h1 className="font-heading text-6xl font-bold leading-[1.05] tracking-tight">Share. Split. Settle.</h1>
-            <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
-              Expense management for nuanced splits with your partners, roommates, travel mates, or anyone else.
-            </p>
-          </div>
+          <img src={handshakeImg} alt="Handshake split agreement" className="h-36 w-auto self-start object-contain animate-fade-in" />
 
-          <Button size="lg" onClick={() => openAuth("signup")} className="w-fit cursor-pointer rounded-full px-7 py-6 text-base">
+          <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
+            Expense management for nuanced splits with your partners, roommates, travel mates, or anyone else.
+          </p>
+
+          <Button size="lg" onClick={() => navigate("/signup")} className="w-fit cursor-pointer rounded-full px-7 py-6 text-base">
             Start settling
             <ArrowRight />
           </Button>
@@ -209,9 +209,12 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
 
         {/* Right */}
         <div className="flex flex-col gap-6">
-          <img
-            src={heroIllustration}
-            alt="Two people splitting a bill at a cafe"
+          <video
+            src={heroVideo}
+            autoPlay
+            loop
+            muted
+            playsInline
             className="h-auto w-full"
           />
 
@@ -239,6 +242,192 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
           </div>
         </div>
       </main>
+
+      {/* HOW IT WORKS SECTION */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="font-heading text-4xl font-bold tracking-tight text-primary mb-4">Three Steps to Split Harmony</h2>
+          <p className="text-muted-foreground text-lg">
+            Say goodbye to awkward reminders, confusing spreadsheets, and math debates. Equaris streamlines splitting.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="flex flex-col items-center text-center p-6 bg-card rounded-2xl border hover:shadow-md transition-shadow">
+            <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-secondary text-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-8">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <h3 className="font-heading text-xl font-bold mb-2">1. Create & Invite</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Create a group for trips, rent, dining, or events. Share the link with friends to get them onboarded instantly.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center text-center p-6 bg-card rounded-2xl border hover:shadow-md transition-shadow">
+            <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-secondary text-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-8">
+                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+                <path d="M8 6h8" strokeLinecap="round" />
+                <path d="M8 10h8" strokeLinecap="round" />
+                <path d="M8 14h6" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h3 className="font-heading text-xl font-bold mb-2">2. Snap & Split</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Scan receipts using Gemini AI OCR or log custom weighted splits. Each item gets auto-assigned accurately.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center text-center p-6 bg-card rounded-2xl border hover:shadow-md transition-shadow">
+            <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-secondary text-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-8">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <h3 className="font-heading text-xl font-bold mb-2">3. Settle Up Instantly</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Equaris computes balances and provides the absolute minimum transfers needed to clear up all debts.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURE DEEP DIVE WITH GRAPHICAL ANIMATION ART */}
+      <section className="bg-card border-t border-b py-20 px-6">
+        <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="flex flex-col gap-6">
+            <span className="font-mono text-xs uppercase tracking-widest text-[var(--gold)] font-semibold">Grounded AI Assistant</span>
+            <h2 className="font-heading text-4xl font-bold tracking-tight text-primary leading-tight">
+              Get Smart Insights About Your Group Expenses
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Our embedded Dispute Assistant uses Gemini AI to give you real-time breakdown of your balances. Instead of digging through logs, just ask!
+            </p>
+            
+            <div className="flex flex-col gap-4 mt-2">
+              <div className="flex gap-4 items-start">
+                <div className="flex size-10 items-center justify-center rounded-full bg-secondary text-primary shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-5">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground">Natural Language Q&A</h4>
+                  <p className="text-sm text-muted-foreground mt-1">Ask questions like "How much did we spend on food this month?" and get instant correct answers.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 items-start">
+                <div className="flex size-10 items-center justify-center rounded-full bg-secondary text-primary shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-5">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground">Budget Risk Notifications</h4>
+                  <p className="text-sm text-muted-foreground mt-1">Receive proactive notifications when your group is approaching or exceeding its budget threshold.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ART: Dynamic CSS Mockup/Illustration of splitting balance graph */}
+          <div className="relative p-8 rounded-2xl bg-background border shadow-sm overflow-hidden flex flex-col gap-4">
+            <div className="absolute top-0 right-0 p-3 opacity-10">
+              <EquarisLogo className="size-40" />
+            </div>
+            
+            <div className="flex items-center justify-between border-b pb-4">
+              <span className="font-mono text-xs text-muted-foreground">SPLIT OPTIMIZATION ENGINE</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">ACTIVE</span>
+            </div>
+
+            {/* Visual Art Grid representing balances */}
+            <div className="flex flex-col gap-3 relative z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs">V</div>
+                  <span className="text-sm font-semibold">Vigil</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-emerald-600 block font-semibold">+₹3,450</span>
+                  <span className="text-[10px] text-muted-foreground">will receive</span>
+                </div>
+              </div>
+              <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: "80%" }} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs">A</div>
+                  <span className="text-sm font-semibold">Alex</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-destructive block font-semibold">-₹2,100</span>
+                  <span className="text-[10px] text-muted-foreground">will pay</span>
+                </div>
+              </div>
+              <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                <div className="h-full bg-destructive rounded-full" style={{ width: "50%" }} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs">K</div>
+                  <span className="text-sm font-semibold">Kunal</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-destructive block font-semibold">-₹1,350</span>
+                  <span className="text-[10px] text-muted-foreground">will pay</span>
+                </div>
+              </div>
+              <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                <div className="h-full bg-destructive rounded-full" style={{ width: "30%" }} />
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mt-2 flex flex-col gap-2 relative z-10">
+              <span className="text-xs font-semibold text-primary">Optimized Settlement Recommendation:</span>
+              <div className="bg-secondary/45 p-3 rounded-lg border border-border/60 flex items-center justify-between text-xs">
+                <span>Alex pays <strong>Vigil</strong></span>
+                <span className="font-mono font-bold text-primary">₹2,100</span>
+              </div>
+              <div className="bg-secondary/45 p-3 rounded-lg border border-border/60 flex items-center justify-between text-xs">
+                <span>Kunal pays <strong>Vigil</strong></span>
+                <span className="font-mono font-bold text-primary">₹1,350</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA SECTION */}
+      <section className="mx-auto max-w-6xl px-6 py-20 text-center">
+        <div className="bg-primary text-primary-foreground rounded-3xl p-12 md:p-16 flex flex-col items-center gap-6 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.03] bg-repeat pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+          <h2 className="font-heading text-3xl md:text-5xl font-bold tracking-tight max-w-xl">
+            Start Splitting Your Bills Seamlessly Today
+          </h2>
+          <p className="max-w-md text-sm md:text-base text-primary-foreground/80 leading-relaxed font-sans">
+            Create groups, invite companions, scan your invoices, and settle up balances with absolute transparency.
+          </p>
+          <Button onClick={() => navigate("/signup")} size="lg" className="bg-background text-primary hover:bg-background/95 cursor-pointer rounded-full px-8 py-6 font-semibold mt-4 transition-transform hover:scale-105">
+            Create Free Account
+          </Button>
+        </div>
+      </section>
+
+      {/* MINIMAL SEPARATOR LINE BEFORE FOOTER */}
+      <hr className="border-border mx-auto max-w-6xl opacity-70" />
 
       {/* FOOTER */}
       <footer id="features" className="mx-auto max-w-6xl px-6 py-10">
@@ -268,88 +457,23 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
         </div>
 
         <div className="mt-8 flex items-center justify-end gap-3">
-          {[Instagram, Facebook, Youtube].map((Icon, i) => (
-            <span key={i} className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          {[
+            { Icon: Instagram, url: "https://instagram.com/equaris" },
+            { Icon: Facebook, url: "https://facebook.com/equaris" },
+            { Icon: Youtube, url: "https://youtube.com/equaris" },
+          ].map(({ Icon, url }, i) => (
+            <a
+              key={i}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all hover:scale-110"
+            >
               <Icon className="size-4" />
-            </span>
+            </a>
           ))}
         </div>
       </footer>
-
-      {/* AUTH MODAL */}
-      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="mb-1 flex items-center gap-2 text-primary">
-              <EquarisLogo className="h-7 w-auto" />
-              <span className="font-heading text-lg font-bold">Equaris</span>
-            </div>
-            <DialogTitle>{authMode === "signin" ? "Welcome back" : "Create your account"}</DialogTitle>
-            <DialogDescription>
-              {authMode === "signin"
-                ? "Sign in to track splits and settle up with your people."
-                : "Start splitting expenses fairly in seconds — it's free."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Button
-            variant="outline"
-            onClick={handleGoogleSignIn}
-            disabled={authLoading}
-            className="w-full cursor-pointer gap-2"
-          >
-            <GoogleG />
-            Continue with Google
-          </Button>
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">or</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <form onSubmit={handleEmailAuth} className="flex flex-col gap-4">
-            {authMode === "signup" && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="auth-name">Name</Label>
-                <Input id="auth-name" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your name" autoComplete="name" />
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="auth-email">Email</Label>
-              <Input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="auth-password">Password</Label>
-              <Input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={authMode === "signin" ? "current-password" : "new-password"} />
-            </div>
-
-            {authError && (
-              <Alert variant="destructive">
-                <AlertDescription>{authError}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" disabled={authLoading} className="w-full cursor-pointer">
-              {authLoading ? <Loader2 className="animate-spin" /> : null}
-              {authMode === "signin" ? "Sign in" : "Create account"}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-muted-foreground">
-            {authMode === "signin" ? "New to Equaris?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => {
-                setAuthMode(authMode === "signin" ? "signup" : "signin");
-                setAuthError(null);
-              }}
-              className="cursor-pointer font-medium text-primary hover:underline"
-            >
-              {authMode === "signin" ? "Create an account" : "Sign in"}
-            </button>
-          </p>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

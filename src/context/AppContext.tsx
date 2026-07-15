@@ -61,8 +61,8 @@ const deriveInitialRoute = (): RouteConfig => {
   if (path.startsWith("/groups/")) {
     return { path: "/groups/[id]", params: { id: path.split("/")[2] } };
   }
-  const known = ["/dashboard", "/groups", "/settlements", "/network", "/reports", "/profile", "/settings"];
-  return known.includes(path) ? { path } : { path: "/dashboard" };
+  const known = ["/", "/dashboard", "/groups", "/settlements", "/network", "/reports", "/profile", "/settings", "/login", "/signup"];
+  return known.includes(path) ? { path } : { path: "/" };
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -208,7 +208,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           unsubProfile = null;
         }
         setProfile(null);
-        setCurrentRoute({ path: "/login" });
+        const unauthRoutes = ["/", "/login", "/signup"];
+        if (!unauthRoutes.includes(currentRoute.path)) {
+          setCurrentRoute({ path: "/" });
+        }
       }
 
       setIsLoadingAuth(false);

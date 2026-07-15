@@ -102,10 +102,10 @@
 :root {
   --radius: 0.75rem;
 
-  --background: #f6f0e2;          /* warm cream canvas */
+  --background: #DDD4C1;          /* exact match of video background */
   --foreground: #2a2621;          /* charcoal */
 
-  --card: #fcf9f1;               /* softer-than-canvas card */
+  --card: #ece3d0;               /* softer-than-canvas card, updated to blend with background */
   --card-foreground: #2a2621;
   --popover: #fcf9f1;
   --popover-foreground: #2a2621;
@@ -146,5 +146,25 @@
   --sidebar-accent: #5f2130;                 /* lighter maroon (active/hover) */
   --sidebar-accent-foreground: #f6f0e2;
   --sidebar-border: oklch(1 0 0 / 9%);       /* faint divider on maroon */
-  --sidebar-ring: #c7a15c;
+}
+
+/* Override all white background containers inside the app to match the theme's card color */
+.bg-white {
+  background-color: var(--card) !important;
+}
+
+/* Add clear, crisp boundaries to inputs, selects, and textareas across the entire app */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+select,
+textarea {
+  border: 1.5px solid #c8bda6 !important;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
+  border-color: #4c1522 !important;
+  box-shadow: 0 0 0 2px rgba(76, 21, 34, 0.15) !important;
+  outline: none !important;
 }
