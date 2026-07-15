@@ -106,8 +106,11 @@ export const GroupDetail: React.FC = () => {
       for (const uid of activeGroup.members) {
         try {
           const userDoc = await dbGetDoc("users", uid);
-          if (userDoc?.photoURL) {
-            photos[uid] = userDoc.photoURL;
+          if (userDoc?.exists()) {
+            const data = userDoc.data();
+            if (data?.photoURL) {
+              photos[uid] = data.photoURL;
+            }
           }
         } catch (err) {
           // Ignore fetch errors for individual users
