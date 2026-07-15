@@ -96,6 +96,28 @@ export const GroupDetail: React.FC = () => {
   const [groupInsights, setGroupInsights] = useState<{ type: string; title: string; message: string }[]>([]);
   const [loadingInsights, setLoadingInsights] = useState(false);
 
+  // Member profile pictures state
+  const [memberPhotos, setMemberPhotos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchPhotos = async () => {
+      if (!activeGroup?.members) return;
+      const photos: Record<string, string> = {};
+      for (const uid of activeGroup.members) {
+        try {
+          const userDoc = await dbGetDoc("users", uid);
+          if (userDoc?.photoURL) {
+            photos[uid] = userDoc.photoURL;
+          }
+        } catch (err) {
+          // Ignore fetch errors for individual users
+        }
+      }
+      setMemberPhotos(photos);
+    };
+    fetchPhotos();
+  }, [activeGroup?.members]);
+
   // OCR Receipt scan state
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
@@ -609,9 +631,13 @@ export const GroupDetail: React.FC = () => {
                 <div 
                   key={memberId} 
                   title={memberNames[memberId]}
-                  className="w-7.5 h-7.5 rounded-full border border-background bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground shadow-3xs"
+                  className="w-7.5 h-7.5 rounded-full border border-background bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground shadow-3xs overflow-hidden"
                 >
-                  {memberNames[memberId]?.[0] || "M"}
+                  {memberPhotos[memberId] ? (
+                    <img src={memberPhotos[memberId]} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    memberNames[memberId]?.[0] || "M"
+                  )}
                 </div>
               ))}
             </div>
@@ -933,8 +959,12 @@ export const GroupDetail: React.FC = () => {
                 return (
                   <div key={memberId} className="p-5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-8.5 h-8.5 rounded-full bg-gray-50 border border-gray-150 flex items-center justify-center font-bold text-xs text-gray-800">
-                        {memberNames[memberId]?.[0] || "U"}
+                      <div className="w-8.5 h-8.5 rounded-full bg-gray-50 border border-gray-150 flex items-center justify-center font-bold text-xs text-gray-800 overflow-hidden shrink-0">
+                        {memberPhotos[memberId] ? (
+                          <img src={memberPhotos[memberId]} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          memberNames[memberId]?.[0] || "U"
+                        )}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-gray-900">{memberNames[memberId] || "Member"}</span>
