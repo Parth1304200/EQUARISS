@@ -200,3 +200,26 @@ textarea:focus {
 .border-dashed, .border-dotted {
   border-style: solid !important;
 }
+
+/* Improve contrast and readability of muted, gray, and slate text styles globally */
+.text-muted-foreground, 
+.text-gray-400, 
+.text-slate-400, 
+.text-gray-500, 
+.text-slate-500 {
+  color: #524b3f !important;
+}
+
+/* Darken light icons to match readability improvements */
+svg.text-muted-foreground,
+svg.text-gray-400,
+svg.text-slate-400,
+svg.text-gray-500,
+svg.text-slate-500,
+.text-muted-foreground svg,
+.text-gray-400 svg,
+.text-slate-400 svg,
+.text-gray-500 svg,
+.text-slate-500 svg {
+  color: #524b3f !important;
+}
