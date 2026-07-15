@@ -305,7 +305,7 @@ export const Groups: React.FC = () => {
                     setShowDeleteConfirm(true);
                   }}
                   title="Delete Group"
-                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
