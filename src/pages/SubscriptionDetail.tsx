@@ -251,7 +251,7 @@ export const SubscriptionDetail: React.FC = () => {
         <CardContent>
           {loadingHistory ? (
             <div className="flex py-6 justify-center">
-              <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading History...</span>
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             </div>
           ) : historicalExpenses.length === 0 ? (
             <div className="text-center py-6 text-xs text-muted-foreground font-mono">

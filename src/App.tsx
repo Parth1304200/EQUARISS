@@ -31,11 +31,8 @@ const MainRouter: React.FC = () => {
 
   if (isLoadingAuth) {
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
         <Loader2 className="size-8 animate-spin text-primary" />
-        <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          Initializing Equaris
-        </span>
       </div>
     );
   }

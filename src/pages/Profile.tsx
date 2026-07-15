@@ -139,9 +139,8 @@ export const Profile: React.FC = () => {
       </div>
 
       {!profile ? (
-        <div className={`border rounded-2xl p-10 text-center text-gray-400 ${cardCls}`}>
-          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
-          <p className="text-sm">Loading your profile…</p>
+        <div className={`border rounded-2xl p-10 text-center text-gray-400 ${cardCls} flex items-center justify-center`}>
+          <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

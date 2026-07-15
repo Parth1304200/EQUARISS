@@ -28,6 +28,7 @@ import {
   Palmtree,
   RefreshCw,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -562,13 +563,8 @@ export const Dashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {loadingInsights ? (
-                  <div className="flex flex-col gap-4" aria-label="Loading insights">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="flex flex-col gap-2">
-                        <Skeleton className="h-3.5 w-1/2" />
-                        <Skeleton className="h-3 w-full" />
-                      </div>
-                    ))}
+                  <div className="flex py-8 justify-center items-center">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
                   </div>
                 ) : aiInsights.length > 0 ? (
                   <div className="flex flex-col gap-4">
