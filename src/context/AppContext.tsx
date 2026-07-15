@@ -174,6 +174,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (currentUser) {
         if (unsubProfile) unsubProfile();
 
+        let isFirstLoad = true;
+
         // Listen to User Profile node in real-time
         unsubProfile = onSnapshot(
           doc(db, "users", currentUser.uid),
@@ -181,6 +183,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (docSnap.exists()) {
               const data = docSnap.data() as UserProfile;
               setProfile(data);
+              if (isFirstLoad) {
+                isFirstLoad = false;
+                setIsLoadingAuth(false);
+              }
             } else {
               // Brand-new account: create an empty profile with isOnboarded = false
               // so Onboarding is triggered. NO fake/seeded data.
@@ -198,23 +204,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 createdAt: new Date().toISOString(),
               };
               dbSetDoc("users", currentUser.uid, placeholder)
-                .then(() => setProfile(placeholder))
-                .catch((err) =>
+                .then(() => {
+                  setProfile(placeholder);
+                  if (isFirstLoad) {
+                    isFirstLoad = false;
+                    setIsLoadingAuth(false);
+                  }
+                })
+                .catch((err) => {
                   console.error(
                     "Failed to create initial user profile (check Firestore security rules for 'users'):",
                     err
-                  )
-                );
+                  );
+                  if (isFirstLoad) {
+                    isFirstLoad = false;
+                    setIsLoadingAuth(false);
+                  }
+                });
             }
           },
           (err) => {
-            // Without this handler the profile snapshot fails silently, leaving
-            // `profile` null forever — which strands the user on a half-loaded
-            // dashboard. Surface it so the rules/permissions issue is visible.
             console.error(
               "User profile snapshot failed (likely Firestore security rules denying read on 'users'):",
               err
             );
+            if (isFirstLoad) {
+              isFirstLoad = false;
+              setIsLoadingAuth(false);
+            }
           }
         );
 
@@ -231,9 +248,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!unauthRoutes.includes(currentRoute.path)) {
           setCurrentRoute({ path: "/" });
         }
+        setIsLoadingAuth(false);
       }
-
-      setIsLoadingAuth(false);
     });
 
     return () => {
