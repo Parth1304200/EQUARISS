@@ -8,6 +8,7 @@ import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc } from "firebase/firestore";
 import { dbSetDoc } from "../lib/firestoreQuery";
+import { toast } from "sonner";
 import { 
   Users, 
   Plus, 
@@ -196,8 +197,9 @@ export const Groups: React.FC = () => {
       setShowModal(false);
       
       navigate("/groups/[id]", { id: newGroupId });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to commit group structure:", err);
+      toast.error(err?.message || "Failed to create group");
     }
   };
 
