@@ -263,10 +263,10 @@ export const Groups: React.FC = () => {
           <div
             key={g.id}
             onClick={() => navigate("/groups/[id]", { id: g.id })}
-            className={`border rounded-2xl p-6 transition-all cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs w-full ${
+            className={`border rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs w-full ${
               theme === "dark" 
                 ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/30" 
-                : "bg-white border-slate-200/80 hover:border-slate-300 shadow-sm"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
             }`}
           >
             <div className="flex flex-col gap-3">

@@ -476,7 +476,7 @@ export const Dashboard: React.FC = () => {
                       navigate("/groups/[id]", { id: group.id });
                     }
                   }}
-                  className="group cursor-pointer outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group cursor-pointer outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <CardContent className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
