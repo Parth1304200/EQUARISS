@@ -28,7 +28,6 @@ import {
   Palmtree,
   RefreshCw,
   Plus,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -312,10 +311,10 @@ export const Dashboard: React.FC = () => {
   const eyebrow = "text-xs font-mono uppercase tracking-widest text-muted-foreground";
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
 
       {/* Header */}
-      <div className="flex flex-col justify-between gap-5 border-b pb-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-5 border-b pb-8 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-1.5">
           <span className={eyebrow}>Overview</span>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
@@ -347,26 +346,6 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Empty state — no fake data, real CTA */}
-      {groups.length === 0 && (
-        <div className="flex flex-col items-center gap-5 rounded-xl border-2 border-dashed border-border bg-card/40 p-10 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full border bg-muted text-muted-foreground">
-            <Layers className="size-6" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <h3 className="text-base font-semibold">No active balance groups</h3>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Create your first group to start tracking shared expenses. Everything on your dashboard is built from the
-              spends you and your members log — nothing is pre-filled.
-            </p>
-          </div>
-          <Button id="create-first-group-btn" onClick={() => navigate("/groups")} className="cursor-pointer">
-            <Plus />
-            Create a group
-          </Button>
-        </div>
-      )}
-
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <StatCard
@@ -390,6 +369,26 @@ export const Dashboard: React.FC = () => {
           tone="success"
         />
       </div>
+
+      {/* Empty state — no fake data, real CTA */}
+      {groups.length === 0 && (
+        <div className="flex flex-col items-center gap-5 rounded-xl border border-border bg-card/40 p-10 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full border bg-muted text-muted-foreground">
+            <Layers className="size-6" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <h3 className="text-base font-semibold">No active balance groups</h3>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Create your first group to start tracking shared expenses. Everything on your dashboard is built from the
+              spends you and your members log — nothing is pre-filled.
+            </p>
+          </div>
+          <Button id="create-first-group-btn" onClick={() => navigate("/groups")} className="cursor-pointer">
+            <Plus />
+            Create a group
+          </Button>
+        </div>
+      )}
 
       {/* Group Spend & Budgets tracking */}
       {groups.filter(g => g.status !== "ended").length > 0 && (
@@ -419,8 +418,8 @@ export const Dashboard: React.FC = () => {
                     </div>
                     {g.budget ? (
                       <div className="w-full h-1.5 bg-muted border border-border/50 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${spent > g.budget ? "bg-destructive" : spent > g.budget * 0.7 ? "bg-amber-500" : "bg-emerald-500"}`} 
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${spent > g.budget ? "bg-destructive" : spent > g.budget * 0.7 ? "bg-amber-500" : "bg-emerald-500"}`}
                           style={{ width: `${ratio}%` }}
                         ></div>
                       </div>
@@ -430,9 +429,9 @@ export const Dashboard: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <Button 
+                  <Button
                     onClick={() => navigate("/groups/[id]", { id: g.id })}
-                    variant="ghost" 
+                    variant="ghost"
                     className="w-full text-left text-xs h-7 justify-between font-bold px-0 text-muted-foreground hover:text-foreground cursor-pointer mt-1"
                   >
                     View Group Details
@@ -563,8 +562,13 @@ export const Dashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {loadingInsights ? (
-                  <div className="flex py-8 justify-center items-center">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <div className="flex flex-col gap-4" aria-label="Loading insights">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="flex flex-col gap-2">
+                        <Skeleton className="h-3.5 w-1/2" />
+                        <Skeleton className="h-3 w-full" />
+                      </div>
+                    ))}
                   </div>
                 ) : aiInsights.length > 0 ? (
                   <div className="flex flex-col gap-4">
@@ -757,9 +761,8 @@ const StatCard: React.FC<{
     </CardHeader>
     <CardContent className="flex flex-col gap-1">
       <div
-        className={`text-3xl font-semibold tracking-tight tabular-nums ${
-          tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "text-foreground"
-        }`}
+        className={`text-3xl font-semibold tracking-tight tabular-nums ${tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "text-foreground"
+          }`}
       >
         {value}
       </div>
