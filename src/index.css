@@ -168,3 +168,15 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(76, 21, 34, 0.15) !important;
   outline: none !important;
 }
+
+/* Enforce continuous thin dark solid borders on all cards, boxes, and panel borders */
+.border, .border-t, .border-b, .border-l, .border-r {
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: var(--border) !important;
+}
+
+/* Prevent dotted or dashed patterns in container borders */
+.border-dashed, .border-dotted {
+  border-style: solid !important;
+}
