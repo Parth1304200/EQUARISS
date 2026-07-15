@@ -124,10 +124,13 @@ export const Groups: React.FC = () => {
   };
 
   // Dispatch group creation
+  const [isCreating, setIsCreating] = useState(false);
+
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !profile || !name.trim()) return;
+    if (!user || !profile || !name.trim() || isCreating) return;
 
+    setIsCreating(true);
     try {
       const newGroupId = `group_${Date.now()}`;
       
@@ -138,7 +141,7 @@ export const Groups: React.FC = () => {
       };
       
       selectedFriends.forEach((f) => {
-        namesRecord[f.uid] = f.name;
+        namesRecord[f.uid] = f.name || "Member";
       });
 
       // Budget Config
@@ -177,16 +180,20 @@ export const Groups: React.FC = () => {
 
       await dbSetDoc("groups", newGroupId, groupData);
 
-      // Log initialization activity
-      const activityId = `act_${Date.now()}`;
-      await dbSetDoc(`groups/${newGroupId}/activities`, activityId, {
-        id: activityId,
-        groupId: newGroupId,
-        category: "group_created",
-        message: `${profile.name} created the dispute group "${name.trim()}".`,
-        actorId: user.uid,
-        createdAt: new Date().toISOString()
-      });
+      // Log initialization activity (non-blocking — don't let this fail the whole creation)
+      try {
+        const activityId = `act_${Date.now()}`;
+        await dbSetDoc(`groups/${newGroupId}/activities`, activityId, {
+          id: activityId,
+          groupId: newGroupId,
+          category: "group_created",
+          message: `${profile.name} created the group "${name.trim()}".`,
+          actorId: user.uid,
+          createdAt: new Date().toISOString()
+        });
+      } catch (actErr) {
+        console.warn("Activity log write failed (non-critical):", actErr);
+      }
 
       // Reset Form State
       setName("");
@@ -196,10 +203,13 @@ export const Groups: React.FC = () => {
       setCreationStep(1);
       setShowModal(false);
       
+      toast.success(`Group "${name.trim()}" created!`);
       navigate("/groups/[id]", { id: newGroupId });
     } catch (err: any) {
       console.error("Failed to commit group structure:", err);
-      toast.error(err?.message || "Failed to create group");
+      toast.error(err?.message || "Failed to create group. Check your connection.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -535,20 +545,27 @@ export const Groups: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
                     onClick={() => setCreationStep(1)}
-                    className="flex-1"
+                    className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold font-mono uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     Back
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="submit"
-                    className="flex-1 bg-primary text-primary-foreground"
+                    disabled={isCreating}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold font-mono uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Create Ledger
-                  </Button>
+                    {isCreating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Ledger"
+                    )}
+                  </button>
                 </div>
               </form>
             )}
