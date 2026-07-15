@@ -609,7 +609,7 @@ export const Dashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Alert>
+            <Alert className="transition-all duration-300 hover:-translate-y-1 hover:shadow-md py-2 px-3 text-xs">
               <Zap />
               <AlertTitle>Peer repayments simplified</AlertTitle>
               <AlertDescription>

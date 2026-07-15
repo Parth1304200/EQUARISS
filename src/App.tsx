@@ -54,7 +54,7 @@ const MainRouter: React.FC = () => {
     <div className="flex min-h-screen flex-col bg-background font-sans text-foreground md:flex-row">
       <Navbar />
 
-      <main className="min-h-screen flex-1 px-4 py-6 pb-16 md:h-screen md:overflow-y-auto md:px-8 md:pb-0">
+      <main className="min-h-screen flex-1 px-4 py-6 pb-16 md:h-screen md:overflow-y-auto md:px-8 md:pb-8">
         {(currentRoute.path === "/" || currentRoute.path === "/dashboard" || currentRoute.path === "/login" || currentRoute.path === "/signup") && <Dashboard />}
         {currentRoute.path === "/groups" && <Groups />}
         {currentRoute.path === "/groups/[id]" && <GroupDetail />}

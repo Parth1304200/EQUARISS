@@ -894,7 +894,7 @@ export const GroupDetail: React.FC = () => {
                 return (
                   <div
                     key={exp.id}
-                    className="bg-white border border-gray-150 rounded-xl p-5 flex items-center justify-between group shadow-3xs hover:border-gray-300 transition-colors"
+                    className="bg-white border border-gray-150 rounded-xl p-5 flex items-center justify-between group shadow-3xs hover:border-gray-300 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     <div className="flex items-center gap-4">
                       {/* Avatar initials category mapping */}
