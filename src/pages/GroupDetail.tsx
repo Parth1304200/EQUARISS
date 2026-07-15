@@ -584,7 +584,7 @@ export const GroupDetail: React.FC = () => {
     <div className="w-full max-w-7xl mx-auto px-6 sm:px-12 py-10 flex flex-col gap-10">
       
       {/* Editorial Group Header Banner */}
-      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
+      <div className="bg-card border border-border rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
         <div className="flex flex-col gap-3">
           <button 
             onClick={() => navigate("/groups")}
@@ -672,14 +672,14 @@ export const GroupDetail: React.FC = () => {
 
       {/* Group Detail Mini Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Group Total Spend</span>
           <div className="text-2xl font-semibold tracking-tight text-foreground">
             ₹{overallActiveSpent.toLocaleString("en-IN")}
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">You Owe</span>
           <div className="text-2xl font-semibold tracking-tight text-destructive">
             {(liveBalances[user?.uid || ""] || 0) < -0.01 
@@ -688,7 +688,7 @@ export const GroupDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs">
+        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-1.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Owed to You</span>
           <div className="text-2xl font-semibold tracking-tight text-emerald-600">
             {(liveBalances[user?.uid || ""] || 0) > 0.01 
