@@ -98,9 +98,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ mode }) => {
     <div className="min-h-screen bg-background font-sans text-foreground flex flex-col items-center justify-center p-6 relative">
       <button
         onClick={() => navigate("/")}
-        className="absolute top-6 left-6 flex items-center justify-center cursor-pointer transition-all border border-border bg-card rounded-xl p-2.5 shadow-sm md:p-0 md:border-0 md:bg-transparent md:rounded-none md:shadow-none md:gap-2 md:text-sm md:font-medium text-muted-foreground hover:text-foreground"
+        className="absolute top-6 left-6 flex items-center justify-center cursor-pointer transition-all gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="size-5 md:size-4" />
+        <ArrowLeft className="size-4" />
         <span className="hidden md:inline">Back to Home</span>
       </button>
 

@@ -70,8 +70,7 @@ const deriveInitialRoute = (): RouteConfig => {
     }
     return { path: "/subscriptions/[id]", params: { id } };
   }
-  const known = ["/", "/dashboard", "/groups", "/subscriptions", "/subscriptions/new", "/subscriptions/[id]", "/money", "/settlements", "/network", "/reports", "/profile", "/settings", "/login", "/signup"];
-  return known.includes(path) ? { path } : { path: "/" };
+  return { path };
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -250,7 +249,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           unsubProfile = null;
         }
         setProfile(null);
-        const unauthRoutes = ["/", "/login", "/signup"];
+        const unauthRoutes = [
+          "/", "/login", "/signup",
+          "/about-us", "/features", "/sources",
+          "/about", "/blog", "/careers",
+          "/help", "/contact", "/status",
+          "/privacy", "/terms", "/reporters",
+        ];
         if (!unauthRoutes.includes(currentRoute.path)) {
           setCurrentRoute({ path: "/" });
         }
@@ -446,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (snapshot) => {
           const list: Expense[] = [];
           snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as Expense);
+            list.push({ ...docSnap.data(), id: docSnap.id, groupId: g.id } as Expense);
           });
           byGroup[g.id] = list;
           setAllExpenses(Object.values(byGroup).flat());

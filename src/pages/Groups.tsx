@@ -9,13 +9,13 @@ import { db } from "../lib/firebase";
 import { collection, getDocs, doc } from "firebase/firestore";
 import { dbSetDoc, dbDeleteDoc } from "../lib/firestoreQuery";
 import { toast } from "sonner";
-import { 
-  Users, 
-  Plus, 
-  X, 
-  Tag, 
-  IndianRupee, 
-  HelpCircle, 
+import {
+  Users,
+  Plus,
+  X,
+  Tag,
+  IndianRupee,
+  HelpCircle,
   ArrowRight,
   ShieldCheck,
   PlusCircle,
@@ -65,7 +65,7 @@ const CONTEXT_PRESETS = {
 
 export const Groups: React.FC = () => {
   const { user, profile, groups, navigate, theme } = useApp();
-  
+
   // Create group form state
   const [showModal, setShowModal] = useState(false);
   const [creationStep, setCreationStep] = useState(1);
@@ -81,7 +81,7 @@ export const Groups: React.FC = () => {
   const [tripDailyCap, setTripDailyCap] = useState("");
   const [recurringMonthly, setRecurringMonthly] = useState(true);
   const [messFeeAmount, setMessFeeAmount] = useState("");
-  
+
   // Real friends list state
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<any[]>([]);
@@ -114,7 +114,7 @@ export const Groups: React.FC = () => {
       const q = collection(db, "users");
       const snap = await getDocs(q);
       const friendsUids = profile.friends || [];
-      
+
       snap.forEach((docSnap) => {
         const uData = docSnap.data();
         if (friendsUids.includes(uData.uid)) {
@@ -152,13 +152,13 @@ export const Groups: React.FC = () => {
     setIsCreating(true);
     try {
       const newGroupId = `group_${Date.now()}`;
-      
+
       // Combine current user with selected verified connections
       const memberUids = [user.uid, ...selectedFriends.map((f) => f.uid)];
       const namesRecord: Record<string, string> = {
         [user.uid]: profile.name || "Me",
       };
-      
+
       selectedFriends.forEach((f) => {
         namesRecord[f.uid] = f.name || "Member";
       });
@@ -221,7 +221,7 @@ export const Groups: React.FC = () => {
       setSelectedFriends([]);
       setCreationStep(1);
       setShowModal(false);
-      
+
       toast.success(`Group "${name.trim()}" created!`);
       navigate("/groups/[id]", { id: newGroupId });
     } catch (err: any) {
@@ -234,7 +234,7 @@ export const Groups: React.FC = () => {
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col gap-8">
-      
+
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 border-b border-gray-100 dark:border-white/5 pb-6">
         <div className="flex flex-col gap-1.5">
@@ -248,9 +248,8 @@ export const Groups: React.FC = () => {
         <button
           id="show-create-group-modal-btn"
           onClick={() => setShowModal(true)}
-          className={`flex items-center gap-2 py-3 px-5 font-bold font-mono text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-colors shrink-0 ${
-            theme === "dark" ? "bg-cyan-500 text-black hover:bg-cyan-400" : "bg-black text-white hover:bg-slate-800"
-          }`}
+          className={`flex items-center gap-2 py-3 px-5 font-bold font-mono text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-colors shrink-0 ${theme === "dark" ? "bg-cyan-500 text-black hover:bg-cyan-400" : "bg-black text-white hover:bg-slate-800"
+            }`}
         >
           <Plus className="w-4 h-4" />
           <span>New Group</span>
@@ -263,24 +262,21 @@ export const Groups: React.FC = () => {
           <div
             key={g.id}
             onClick={() => navigate("/groups/[id]", { id: g.id })}
-            className={`border rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs w-full ${
-              theme === "dark" 
-                ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/30" 
+            className={`border rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer flex flex-col justify-between gap-6 group shadow-3xs w-full ${theme === "dark"
+                ? "bg-slate-900/60 border-white/5 hover:border-cyan-500/30"
                 : "bg-white border-slate-200/80 hover:border-slate-300"
-            }`}
+              }`}
           >
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-start">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-extrabold text-lg uppercase ${
-                  theme === "dark" ? "bg-slate-950 border border-white/5 text-cyan-400" : "bg-slate-50 border border-slate-150 text-slate-700"
-                }`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-extrabold text-lg uppercase ${theme === "dark" ? "bg-slate-950 border border-white/5 text-cyan-400" : "bg-slate-50 border border-slate-150 text-slate-700"
+                  }`}>
                   {g.name?.[0] || "G"}
                 </div>
-                <span className={`text-[9px] font-mono select-none px-2 py-0.5 border rounded-full font-bold ${
-                  g.status === "ended"
+                <span className={`text-[9px] font-mono select-none px-2 py-0.5 border rounded-full font-bold ${g.status === "ended"
                     ? "border-red-200 text-red-500 bg-red-50"
                     : theme === "dark" ? "border-cyan-500/20 text-cyan-400 bg-cyan-500/5 bg-opacity-20" : "border-slate-150 text-slate-500 bg-slate-50"
-                }`}>{g.status === "ended" ? "ENDED" : "ACTIVE"}</span>
+                  }`}>{g.status === "ended" ? "ENDED" : "ACTIVE"}</span>
               </div>
 
               <div className="flex flex-col">
@@ -544,11 +540,10 @@ export const Groups: React.FC = () => {
                           <div
                             key={f.uid}
                             onClick={() => handleToggleFriend(f)}
-                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                              isSelected 
+                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${isSelected
                                 ? "bg-primary/5 border-primary text-foreground font-semibold"
                                 : "bg-slate-50 border-slate-200 text-slate-800 hover:border-slate-300"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-mono text-xs overflow-hidden shrink-0">
@@ -564,11 +559,10 @@ export const Groups: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                              isSelected 
-                                ? "bg-primary border-primary text-primary-foreground" 
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected
+                                ? "bg-primary border-primary text-primary-foreground"
                                 : "border-gray-300"
-                            }`}>
+                              }`}>
                               {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                             </div>
                           </div>

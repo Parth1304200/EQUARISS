@@ -22,6 +22,18 @@ import { Subscriptions } from "./pages/Subscriptions";
 import { AddSubscription } from "./pages/AddSubscription";
 import { SubscriptionDetail } from "./pages/SubscriptionDetail";
 import { MoneyManagement } from "./pages/MoneyManagement";
+import { AboutUsPage } from "./pages/AboutUsPage";
+import { FeaturesPage } from "./pages/FeaturesPage";
+import { SourcesPage } from "./pages/SourcesPage";
+import { AboutPage } from "./pages/AboutPage";
+import { BlogPage } from "./pages/BlogPage";
+import { CareersPage } from "./pages/CareersPage";
+import { HelpPage } from "./pages/HelpPage";
+import { ContactPage } from "./pages/ContactPage";
+import { StatusPage } from "./pages/StatusPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { TermsPage } from "./pages/TermsPage";
+import { ReportersPage } from "./pages/ReportersPage";
 import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -36,6 +48,19 @@ const MainRouter: React.FC = () => {
       </div>
     );
   }
+
+  if (currentRoute.path === "/about-us") return <AboutUsPage />;
+  if (currentRoute.path === "/features") return <FeaturesPage />;
+  if (currentRoute.path === "/sources") return <SourcesPage />;
+  if (currentRoute.path === "/about") return <AboutPage />;
+  if (currentRoute.path === "/blog") return <BlogPage />;
+  if (currentRoute.path === "/careers") return <CareersPage />;
+  if (currentRoute.path === "/help") return <HelpPage />;
+  if (currentRoute.path === "/contact") return <ContactPage />;
+  if (currentRoute.path === "/status") return <StatusPage />;
+  if (currentRoute.path === "/privacy") return <PrivacyPage />;
+  if (currentRoute.path === "/terms") return <TermsPage />;
+  if (currentRoute.path === "/reporters") return <ReportersPage />;
 
   // Prevent accessing protected views if not logged in
   if (!user) {

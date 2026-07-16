@@ -26,8 +26,7 @@ import {
   IndianRupee,
   Star,
   Instagram,
-  Facebook,
-  Youtube,
+  Linkedin,
 } from "lucide-react";
 import { EquarisLogo } from "../components/EquarisLogo";
 import heroVideo from "@/assets/ARTT.mp4";
@@ -59,7 +58,7 @@ const FEATURES = [
 ];
 
 const FOOTER_COLS = [
-  { title: "Product", items: ["Home", "Pricing", "Features", "Sources"] },
+  { title: "Product", items: ["Home", "About Us", "Features", "Sources"] },
   { title: "Company", items: ["About", "Blog", "Careers"] },
   { title: "Support", items: ["Help", "Contact", "Status"] },
   { title: "Legal", items: ["Privacy", "Terms", "Reporters"] },
@@ -72,6 +71,12 @@ const GoogleG = () => (
     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
     <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z" />
+  </svg>
+);
+
+const XLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
 
@@ -160,7 +165,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
         <nav className="hidden items-center gap-1 md:flex">
           {[
             { label: "Home", action: () => scrollTo("top") },
-            { label: "Pricing", action: () => scrollTo("features") },
+            { label: "About Us", action: () => scrollTo("features") },
             { label: "Sources", action: () => scrollTo("features") },
           ].map((l) => (
             <Button key={l.label} variant="ghost" onClick={l.action} className="cursor-pointer text-foreground/80 hover:text-foreground">
@@ -173,7 +178,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
         </nav>
 
         <Button onClick={() => navigate("/signup")} className="cursor-pointer rounded-full px-5">
-          Get for free
+          START NOW
         </Button>
       </header>
 
@@ -218,8 +223,8 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
             className="h-auto w-full"
           />
 
-          <div className="grid grid-cols-1 gap-6 border-t pt-6 sm:grid-cols-2">
-            <ul className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <ul className="flex flex-col items-center sm:items-start gap-3">
               {FEATURES.map(({ icon: Icon, label }) => (
                 <li key={label} className="flex items-center gap-2.5 text-sm font-medium">
                   <Icon className="size-4 text-primary" />
@@ -228,7 +233,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
               ))}
             </ul>
 
-            <figure className="flex flex-col gap-2">
+            <figure className="flex flex-col items-center text-center sm:items-start sm:text-left gap-2">
               <div className="flex gap-0.5 text-[var(--gold)]">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star key={i} className="size-4 fill-current" />
@@ -421,13 +426,12 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
             Create groups, invite companions, scan your invoices, and settle up balances with absolute transparency.
           </p>
           <Button onClick={() => navigate("/signup")} size="lg" className="bg-background text-primary hover:bg-background/95 cursor-pointer rounded-full px-8 py-6 font-semibold mt-4 transition-transform hover:scale-105">
-            Create Free Account
+            START NOW
           </Button>
         </div>
       </section>
 
       {/* MINIMAL SEPARATOR LINE BEFORE FOOTER */}
-      <hr className="border-border mx-auto max-w-6xl opacity-70" />
 
       {/* FOOTER */}
       <footer id="features" className="mx-auto max-w-6xl px-6 py-10">
@@ -438,29 +442,41 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
               <span className="font-heading text-lg font-bold">EQUARIS</span>
             </div>
             <p className="text-xs text-muted-foreground">© 2024 Equaris Technologies</p>
+            <a href="mailto:splitequaris@gmail.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">splitequaris@gmail.com</a>
           </div>
 
           {FOOTER_COLS.map((col) => (
             <div key={col.title} className="flex flex-col gap-2.5">
               <h4 className="font-mono text-[11px] font-semibold uppercase tracking-widest text-foreground">{col.title}</h4>
-              {col.items.map((item) => (
-                <button
-                  key={item}
-                  onClick={() => scrollTo("top")}
-                  className="cursor-pointer text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {item}
-                </button>
-              ))}
+              {col.items.map((item) => {
+                const itemPath = item === "Home" ? "#" : "/" + item.toLowerCase().replace(/\s+/g, "-");
+                return (
+                  <a
+                    key={item}
+                    href={itemPath}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (item === "Home") {
+                        scrollTo("top");
+                      } else {
+                        window.location.href = itemPath;
+                      }
+                    }}
+                    className="cursor-pointer text-left text-sm text-muted-foreground transition-colors hover:text-foreground block"
+                  >
+                    {item}
+                  </a>
+                );
+              })}
             </div>
           ))}
         </div>
 
         <div className="mt-8 flex items-center justify-end gap-3">
           {[
-            { Icon: Instagram, url: "https://instagram.com/equaris" },
-            { Icon: Facebook, url: "https://facebook.com/equaris" },
-            { Icon: Youtube, url: "https://youtube.com/equaris" },
+            { Icon: Instagram, url: "https://instagram.com/splitequaris" },
+            { Icon: Linkedin, url: "https://linkedin.com/company/splitequaris" },
+            { Icon: XLogo, url: "https://x.com/splitequaris" },
           ].map(({ Icon, url }, i) => (
             <a
               key={i}

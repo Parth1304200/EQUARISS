@@ -5,7 +5,8 @@
 
 import React, { useMemo } from "react";
 import { useApp } from "../context/AppContext";
-import { Sparkles, PieChart } from "lucide-react";
+import { Sparkles, PieChart, Smile, Meh, Frown } from "lucide-react";
+import { calculateBalances } from "../lib/settleEngine";
 
 // Human-friendly labels for raw expense category keys.
 const CATEGORY_LABELS: Record<string, string> = {
@@ -23,7 +24,7 @@ const labelFor = (key: string) =>
   CATEGORY_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
 
 export const Reports: React.FC = () => {
-  const { groups, allExpenses } = useApp();
+  const { groups, allExpenses, user } = useApp();
 
   // Only real, non-settlement spend feeds the analytics.
   const spendExpenses = useMemo(
@@ -48,31 +49,46 @@ export const Reports: React.FC = () => {
 
   const maxAmt = categoryList[0]?.amount || 1;
 
-  const totalBudget = useMemo(
-    () => groups.reduce((sum, g) => sum + (g.budget || 0), 0),
-    [groups]
-  );
+  const { settlementScore, unsettledAmount, moodText, MoodIcon, moodColor } = useMemo(() => {
+    if (!user) return { settlementScore: 850, unsettledAmount: 0, moodText: "Excellent", MoodIcon: Smile, moodColor: "text-emerald-400" };
+    
+    let totalUnsettled = 0;
+    
+    // Group expenses by groupId
+    const expensesByGroup: Record<string, typeof allExpenses> = {};
+    allExpenses.forEach(exp => {
+      if (!expensesByGroup[exp.groupId]) expensesByGroup[exp.groupId] = [];
+      expensesByGroup[exp.groupId].push(exp);
+    });
 
-  // Budget Health: how much of the combined group budget is still available.
-  // Null when no budgets are configured (we don't invent a score).
-  const health = useMemo(() => {
-    if (totalBudget <= 0) return null;
-    const used = totalSpent / totalBudget;
-    const score = Math.max(0, Math.min(100, Math.round((1 - used) * 100)));
-    let status: string;
-    let caption: string;
-    if (score >= 70) {
-      status = "HEALTHY";
-      caption = "Excellent Spend Discipline";
-    } else if (score >= 40) {
-      status = "MODERATE";
-      caption = "Watch Your Pace";
-    } else {
-      status = "AT RISK";
-      caption = "Budget Nearly Exhausted";
+    groups.forEach(group => {
+      const gExpenses = expensesByGroup[group.id] || [];
+      const balances = calculateBalances(group.members, gExpenses);
+      const myBal = balances[user.uid] || 0;
+      totalUnsettled += Math.abs(myBal);
+    });
+
+    // Score calculation (like CIBIL, max 850, min 300)
+    // Every 50 Rs unsettled drops the score by 1 point.
+    let score = 850 - Math.floor(totalUnsettled / 50);
+    score = Math.max(300, Math.min(850, score));
+
+    let moodText = "Excellent";
+    let MoodIcon = Smile;
+    let moodColor = "text-emerald-400";
+    
+    if (score < 500) {
+      moodText = "Poor";
+      MoodIcon = Frown;
+      moodColor = "text-red-400";
+    } else if (score < 750) {
+      moodText = "Fair";
+      MoodIcon = Meh;
+      moodColor = "text-amber-400";
     }
-    return { score, status, caption, usedPct: Math.round(used * 100) };
-  }, [totalBudget, totalSpent]);
+
+    return { settlementScore: score, unsettledAmount: totalUnsettled, moodText, MoodIcon, moodColor };
+  }, [groups, allExpenses, user]);
 
   const topCategory = categoryList[0]
     ? { label: labelFor(categoryList[0].category), pct: Math.round((categoryList[0].amount / totalSpent) * 100) }
@@ -131,55 +147,40 @@ export const Reports: React.FC = () => {
             </div>
           </div>
 
-          {/* Budget metrics card */}
+          {/* Settlement Score card */}
           <div className="flex flex-col gap-6">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-emerald-500 animate-pulse" />
-              Budget Health Score
+              Peer Settlement Score
             </h3>
 
             <div className="bg-black text-[#fafafa] border border-black rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10"></div>
 
-              {health ? (
-                <>
-                  <div className="flex justify-between items-center text-xs text-neutral-400 font-mono">
-                    <span>SCORE</span>
-                    <span className={`px-2 py-0.5 border rounded-full text-[10px] ${
-                      health.score >= 70
-                        ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/10"
-                        : health.score >= 40
-                          ? "text-amber-400 bg-amber-500/10 border-amber-500/10"
-                          : "text-red-400 bg-red-500/10 border-red-500/10"
-                    }`}>{health.status}</span>
-                  </div>
+              <div className="flex justify-between items-center text-xs text-neutral-400 font-mono">
+                <span>CIBIL-STYLE SCORE</span>
+                <span className={`px-2 py-0.5 border rounded-full text-[10px] ${
+                  settlementScore >= 750
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/10"
+                    : settlementScore >= 500
+                      ? "text-amber-400 bg-amber-500/10 border-amber-500/10"
+                      : "text-red-400 bg-red-500/10 border-red-500/10"
+                }`}>{moodText}</span>
+              </div>
 
-                  <div className="flex flex-col gap-0.5">
-                    <h2 className="text-4xl font-black font-serif leading-none text-white">{health.score}%</h2>
-                    <span className="text-[11px] text-[#A3A3A3] font-mono leading-none mt-1">{health.caption}</span>
-                  </div>
+              <div className="flex items-center gap-4">
+                <MoodIcon className={`w-14 h-14 ${moodColor} drop-shadow-lg`} strokeWidth={1.5} />
+                <div className="flex flex-col gap-0.5">
+                  <h2 className="text-4xl font-black font-serif leading-none text-white">{settlementScore}</h2>
+                  <span className="text-[11px] text-[#A3A3A3] font-mono leading-none mt-1">out of 850</span>
+                </div>
+              </div>
 
-                  <p className="text-xs text-[#A3A3A3] leading-relaxed mt-2.5 border-t border-white/10 pt-4 font-medium">
-                    You have spent ₹{totalSpent.toLocaleString("en-IN")} of your ₹{totalBudget.toLocaleString("en-IN")} combined budget ({health.usedPct}% used).
-                    {topCategory && ` ${topCategory.label} is your largest category at ${topCategory.pct}% of tracked spend.`}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center text-xs text-neutral-400 font-mono">
-                    <span>SCORE</span>
-                    <span className="text-neutral-300 bg-white/10 px-2 py-0.5 border border-white/10 rounded-full text-[10px]">NO BUDGET</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <h2 className="text-4xl font-black font-serif leading-none text-white">₹{totalSpent.toLocaleString("en-IN")}</h2>
-                    <span className="text-[11px] text-[#A3A3A3] font-mono leading-none mt-1">Total tracked spend</span>
-                  </div>
-                  <p className="text-xs text-[#A3A3A3] leading-relaxed mt-2.5 border-t border-white/10 pt-4 font-medium">
-                    Set a budget on your group{groups.length > 1 ? "s" : ""} to unlock a live budget health score.
-                    {topCategory && ` So far, ${topCategory.label} is your largest category at ${topCategory.pct}% of spend.`}
-                  </p>
-                </>
-              )}
+              <p className="text-xs text-[#A3A3A3] leading-relaxed mt-2.5 border-t border-white/10 pt-4 font-medium">
+                {unsettledAmount > 0 
+                  ? `You have ₹${unsettledAmount.toLocaleString("en-IN")} in unsettled peer balances. Settle up to improve your mood score!` 
+                  : "All your debts and peer splits are fully settled. Excellent!"}
+              </p>
             </div>
           </div>
 

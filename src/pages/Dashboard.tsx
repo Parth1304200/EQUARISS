@@ -121,6 +121,11 @@ export const Dashboard: React.FC = () => {
     };
   }, [user, groups, allExpenses]);
 
+  const totalBudget = useMemo(
+    () => groups.filter(g => g.status !== "ended").reduce((sum, g) => sum + (g.budget || 0), 0),
+    [groups]
+  );
+
   const handleAddExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
@@ -368,12 +373,31 @@ export const Dashboard: React.FC = () => {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <StatCard
-          label="Total group spend"
-          value={inr(totalSpent)}
-          hint="Aggregated across active pools"
-          icon={IndianRupee}
-        />
+        <Card className="shadow-xs transition-shadow hover:shadow-md">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider">Total group spend</span>
+            <IndianRupee className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-heading font-bold">{inr(totalSpent)}</div>
+            {totalBudget > 0 ? (
+              <div className="flex flex-col gap-1.5 mt-2">
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground uppercase font-bold">
+                  <span>Budget Health</span>
+                  <span>Limit: {inr(totalBudget)}</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${totalSpent > totalBudget ? "bg-destructive" : totalSpent > totalBudget * 0.75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                    style={{ width: `${Math.min(100, Math.round((totalSpent / totalBudget) * 100))}%` }}
+                  ></div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Aggregated across active pools</p>
+            )}
+          </CardContent>
+        </Card>
         <StatCard
           label="You owe"
           value={inr(youOwe)}

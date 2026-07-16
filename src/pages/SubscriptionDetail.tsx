@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { doc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
-import { ArrowLeft, Edit2, Play, Pause, Trash2, Calendar, Users, ShieldAlert } from "lucide-react";
+import { Loader2, ArrowLeft, Edit2, Play, Pause, Trash2, Calendar, Users, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -208,7 +208,7 @@ export const SubscriptionDetail: React.FC = () => {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogCancel variant="outline" size="default">Go Back</AlertDialogCancel>
                   <AlertDialogAction onClick={toggleStatus}>
                     Confirm {sub.status === "active" ? "Pause" : "Resume"}
                   </AlertDialogAction>
@@ -233,7 +233,7 @@ export const SubscriptionDetail: React.FC = () => {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogCancel variant="outline" size="default">Go Back</AlertDialogCancel>
                   <AlertDialogAction onClick={deleteSubscription} className="bg-destructive text-destructive-foreground">Confirm Cancel</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
