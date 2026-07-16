@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { motion } from "motion/react";
 import { useApp } from "../context/AppContext";
 import { logoutUser } from "../lib/firebase";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,7 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const Brand = ({ onClick, className }: { onClick?: () => void; className?: string }) => (
+  const renderBrand = (onClick?: () => void, className?: string) => (
     <button
       onClick={onClick}
       className={cn("group flex cursor-pointer select-none items-center gap-3.5 outline-none", className)}
@@ -99,33 +100,45 @@ export const Navbar: React.FC = () => {
     </button>
   );
 
-  const NavLinks = () => (
-    <nav className="flex flex-col gap-1">
+  const renderNavLinks = (prefix: string) => (
+    <nav className="flex flex-col gap-1 relative">
       {LINKS.map((link) => {
         const Icon = link.icon;
         const active = isActive(link.path);
         return (
           <button
             key={link.path}
-            id={`nav-${link.label.toLowerCase()}`}
+            id={`${prefix}-nav-${link.label.toLowerCase()}`}
             onClick={() => go(link.path)}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              "relative flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
               active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                ? "text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/75 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/30"
             )}
           >
-            <Icon className="size-4 shrink-0" />
-            {link.label}
+            {active && (
+              <motion.div
+                layoutId={`${prefix}-active-indicator`}
+                className="absolute inset-0 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.1)] pointer-events-none"
+                initial={false}
+                transition={{
+                  type: "spring",
+                  stiffness: 350,
+                  damping: 30,
+                }}
+              />
+            )}
+            <Icon className="relative z-10 size-4 shrink-0" />
+            <span className="relative z-10">{link.label}</span>
           </button>
         );
       })}
     </nav>
   );
 
-  const UserFooter = () => (
+  const renderUserFooter = () => (
     <div className="flex items-center justify-between gap-2 border-t border-sidebar-border pt-4">
       <button
         onClick={() => go("/profile")}
@@ -160,9 +173,9 @@ export const Navbar: React.FC = () => {
       {/* DESKTOP SIDEBAR */}
       <aside className="sticky top-0 hidden min-h-screen w-64 shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar p-6 text-sidebar-foreground md:flex">
         <div className="flex flex-col gap-8">
-          <Brand onClick={() => navigate("/dashboard")} />
+          {renderBrand(() => navigate("/dashboard"))}
 
-          <NavLinks />
+          {renderNavLinks("desktop")}
 
           <div className="flex flex-col gap-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-4">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/60">
@@ -174,12 +187,12 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {user && <UserFooter />}
+        {user && renderUserFooter()}
       </aside>
 
       {/* MOBILE HEADER */}
       <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b bg-background px-6 md:hidden">
-        <Brand onClick={() => navigate("/dashboard")} className="text-primary" />
+        {renderBrand(() => navigate("/dashboard"), "text-primary")}
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger
@@ -195,12 +208,12 @@ export const Navbar: React.FC = () => {
           >
             <SheetHeader className="p-0">
               <SheetTitle className="text-sidebar-foreground">
-                <Brand onClick={() => go("/dashboard")} />
+                {renderBrand(() => go("/dashboard"))}
               </SheetTitle>
             </SheetHeader>
             <div className="mt-6 flex flex-1 flex-col justify-between">
-              <NavLinks />
-              {user && <UserFooter />}
+              {renderNavLinks("mobile")}
+              {user && renderUserFooter()}
             </div>
           </SheetContent>
         </Sheet>

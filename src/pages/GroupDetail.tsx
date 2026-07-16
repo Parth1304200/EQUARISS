@@ -127,6 +127,7 @@ export const GroupDetail: React.FC = () => {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   // PDF statement generator trigger
   const handlePrintStatement = () => {
@@ -891,14 +892,15 @@ export const GroupDetail: React.FC = () => {
             <div className="flex flex-col gap-4">
               {expensesOnly.map((exp) => {
                 const payerName = activeGroup.memberNames[exp.paidBy] || "Someone";
+                const isConfirming = confirmingDeleteId === exp.id;
                 return (
                   <div
                     key={exp.id}
-                    className="bg-white border border-gray-150 rounded-xl p-5 flex items-center justify-between group shadow-3xs hover:border-gray-300 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                    className={`bg-white border rounded-xl p-5 flex items-center justify-between group shadow-3xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${isConfirming ? 'border-red-300 bg-red-50/50' : 'border-gray-150 hover:border-gray-300'}`}
                   >
                     <div className="flex items-center gap-4">
                       {/* Avatar initials category mapping */}
-                      <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-base">
+                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center text-base ${isConfirming ? 'bg-red-100 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100'}`}>
                         {exp.category === "food" && "F"}
                         {exp.category === "rent" && "R"}
                         {exp.category === "travel" && "T"}
@@ -907,12 +909,12 @@ export const GroupDetail: React.FC = () => {
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <h4 className="text-sm font-bold text-gray-900">{exp.title}</h4>
-                        <p className="text-[11px] text-gray-500 font-medium">
-                          Paid by <strong className="text-gray-700">{payerName}</strong> • {exp.date}
+                        <h4 className={`text-sm font-bold ${isConfirming ? 'text-red-900' : 'text-gray-900'}`}>{exp.title}</h4>
+                        <p className={`text-[11px] font-medium ${isConfirming ? 'text-red-700/70' : 'text-gray-500'}`}>
+                          Paid by <strong className={isConfirming ? 'text-red-800' : 'text-gray-700'}>{payerName}</strong> • {exp.date}
                         </p>
                         {exp.notes && (
-                          <p className="text-[10px] text-[#A3A3A3] font-mono leading-none mt-0.5">
+                          <p className={`text-[10px] font-mono leading-none mt-0.5 ${isConfirming ? 'text-red-600/60' : 'text-[#A3A3A3]'}`}>
                             "{exp.notes}"
                           </p>
                         )}
@@ -921,17 +923,27 @@ export const GroupDetail: React.FC = () => {
 
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col items-end">
-                        <span className="text-sm font-black text-gray-900 font-mono">₹{exp.amount.toLocaleString("en-IN")}</span>
-                        <span className="text-[10px] text-gray-400">Total bill</span>
+                        <span className={`text-sm font-black font-mono ${isConfirming ? 'text-red-900' : 'text-gray-900'}`}>₹{exp.amount.toLocaleString("en-IN")}</span>
+                        <span className={`text-[10px] ${isConfirming ? 'text-red-700/60' : 'text-gray-400'}`}>Total bill</span>
                       </div>
                       
-                      <button
-                        onClick={() => handleDeleteExpense(exp.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-500 rounded-lg transition-all cursor-pointer"
-                        title="Delete expense"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isConfirming ? (
+                        <div className="flex items-center gap-2">
+                           <button onClick={() => setConfirmingDeleteId(null)} className="text-[10px] font-bold text-red-500 hover:text-red-800 uppercase tracking-wider cursor-pointer">Cancel</button>
+                           <button onClick={() => {
+                               handleDeleteExpense(exp.id);
+                               setConfirmingDeleteId(null);
+                             }} className="bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm cursor-pointer">Delete</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingDeleteId(exp.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all cursor-pointer"
+                          title="Delete expense"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
