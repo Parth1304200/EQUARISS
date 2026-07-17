@@ -23,7 +23,6 @@ import { toast } from "sonner";
 import { 
   Users, 
   Plus, 
-  UploadCloud, 
   ArrowRight, 
   CheckCircle,
   FileText, 
@@ -32,7 +31,6 @@ import {
   CreditCard,
   QrCode,
   Sparkles,
-  ShieldCheck,
   Calendar,
   AlertCircle,
   Clock,
@@ -44,7 +42,6 @@ import {
   faFileLines,
   faScaleBalanced,
   faLightbulb,
-  faCamera,
   faClock,
   faHome,
   faWallet
@@ -66,7 +63,7 @@ export const GroupDetail: React.FC = () => {
     refetchActiveGroupData
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "receipts" | "timeline" | "roommate" | "budget">("expenses");
+  const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "suggest" | "timeline" | "roommate" | "budget">("expenses");
 
   // Roommate rent splitter states
   const [roommateRent, setRoommateRent] = useState("");
@@ -125,10 +122,6 @@ export const GroupDetail: React.FC = () => {
     fetchPhotos();
   }, [activeGroup?.members]);
 
-  // OCR Receipt scan state
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<any>(null);
-  const [ocrError, setOcrError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -505,61 +498,10 @@ export const GroupDetail: React.FC = () => {
       setExpAmount("");
       setExpNotes("");
       setShowAddExpense(false);
-      setScanResult(null);
       refetchActiveGroupData();
     } catch (err) {
       console.error("Failed to save expense:", err);
     }
-  };
-
-  // Receipt File drop scanner
-  const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setScanning(true);
-    setOcrError(null);
-    setScanResult(null);
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const resultSrc = reader.result as string;
-        // Trim standard base64 data URL metadata prefix like "data:image/png;base64,"
-        const base64Clean = resultSrc.split(",")[1];
-        const mimeType = file.type;
-
-        // Fetch our Express API OCR scanning endpoint
-        const response = await fetch("/api/receipt/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imgBase64: base64Clean, mimeType })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setScanResult(data);
-          
-          // Pre-fill manual form values
-          setExpTitle(data.title || "Scanned Bill");
-          setExpAmount(data.amount?.toString() || "");
-          setExpCategory(data.category || "food");
-          if (data.date) {
-            setExpDate(data.date);
-          }
-          
-          // Prompt inline form opening
-          setShowAddExpense(true);
-        } else {
-          setOcrError("Gemini could not analyze the receipt clearly. Please check the image or enter details manually.");
-        }
-      } catch (err: any) {
-        setOcrError(err?.message || "Internal receipt scanning error occurred.");
-      } finally {
-        setScanning(false);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleDeleteExpense = async (expId: string) => {
@@ -727,7 +669,6 @@ export const GroupDetail: React.FC = () => {
           { key: "suggest", label: "Smart Settlement Recommendations", count: liveSuggestions.length, faIcon: faLightbulb },
           { key: "budget", label: "Budget & Limits", count: null, faIcon: faWallet },
           ...(activeGroup.category === "roommates" ? [{ key: "roommate", label: "Rent & Utilities Splitter", count: null, faIcon: faHome }] : []),
-          { key: "receipts", label: "Scan Bills (AI Vision OCR)", count: null, faIcon: faCamera },
           { key: "timeline", label: "Activity Audit Log", count: activeGroupActivities.length, faIcon: faClock }
         ].map((tab) => (
           <button
@@ -785,19 +726,13 @@ export const GroupDetail: React.FC = () => {
                 <h4 className="text-sm font-black text-gray-900 flex items-center justify-between">
                   <span>Logged Expense Information</span>
                   <button 
-                    onClick={() => { setShowAddExpense(false); setScanResult(null); }}
+                    onClick={() => setShowAddExpense(false)}
                     className="p-1 rounded-md text-gray-400 hover:text-black cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </h4>
                 
-                {scanResult && (
-                  <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs rounded-lg p-3 flex gap-2 items-center">
-                    <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
-                    <span><strong>AI scanner auto-filled standard values!</strong> Please verify items & edit below.</span>
-                  </div>
-                )}
 
                 <form onSubmit={handleAddExpenseSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div className="flex flex-col gap-1.5">
@@ -955,7 +890,7 @@ export const GroupDetail: React.FC = () => {
 
               {expensesOnly.length === 0 && (
                 <div className="border border-dashed border-gray-150 rounded-xl p-10 text-center text-gray-400 text-xs">
-                  No purchase records logged to this pool yet. Let's record peer expenses or try our Vision scan!
+                  No purchase records logged to this pool yet. Add your first expense to get started.
                 </div>
               )}
             </div>
@@ -1082,65 +1017,6 @@ export const GroupDetail: React.FC = () => {
                   <span>Everyone is fully settled up! Ready to travel more.</span>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: Receipt Scanning (AI Vision OCR) */}
-        {activeTab === "receipts" && (
-          <div className="flex flex-col gap-6 max-w-xl">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold text-gray-400 font-mono tracking-widest uppercase">Smart Scanning</span>
-              <h3 className="font-sans font-black text-gray-900 text-lg">AI-powered Receipt Processing</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Drop your restaurant bills, Airbnb receipts, or fuel invoices below. Our server-side Gemini 3.5 Multimodal OCR scans and converts them instantly into typed splits.
-              </p>
-            </div>
-
-            {/* Drag drop dropzone */}
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 bg-white text-center flex flex-col items-center justify-center gap-4 relative">
-              <div className="p-3.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-400">
-                <UploadCloud className="w-6 h-6 text-inherit" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-gray-700">Choose custom bill picture</p>
-                <p className="text-[11px] text-gray-400 font-mono">JPG, PNG, up to 10MB sizes allowed</p>
-              </div>
-
-              <input
-                type="file"
-                accept="image/*"
-                id="receipt-file-input"
-                onChange={handleReceiptFile}
-                disabled={scanning}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
-
-              {scanning && (
-                <div className="absolute inset-0 bg-white/95 flex flex-col items-center justify-center gap-3 rounded-2xl">
-                  <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                    <span>Gemini 3.5 Vision OCR running...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {ocrError && (
-              <p className="text-xs text-red-500 text-center bg-red-50 border border-red-100 rounded-lg p-2.5">
-                {ocrError}
-              </p>
-            )}
-
-            <div className="bg-gray-50 border border-gray-150 rounded-xl p-5 flex flex-col gap-3">
-              <h4 className="text-xs font-bold text-gray-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Zero-weight secure server translation
-              </h4>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                Images are sent securely to our back-end proxy where they are analyzed using advanced Gemini 3.5 models. We never store copyable personal invoice information permanently.
-              </p>
             </div>
           </div>
         )}
