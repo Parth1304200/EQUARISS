@@ -280,14 +280,14 @@ export const Dashboard: React.FC = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [spendExpenses]);
 
-  // Fetch server-side Gemini insights from REAL expenses only.
+  // Fetch server-side AI insights (Ollama) from REAL expenses only.
   const loadAInsights = async () => {
     if (spendExpenses.length === 0) return;
     setLoadingInsights(true);
     try {
       const mergedNames: Record<string, string> = {};
       groups.forEach((g) => Object.assign(mergedNames, g.memberNames || {}));
-      const res = await fetch("/api/gemini/insights", {
+      const res = await fetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -301,7 +301,7 @@ export const Dashboard: React.FC = () => {
         setAiInsights(data);
       }
     } catch (err) {
-      console.error("Failed to fetch Gemini insights:", err);
+      console.error("Failed to fetch insights:", err);
     } finally {
       setLoadingInsights(false);
     }

@@ -14,6 +14,12 @@
   to = "/.netlify/functions/assistant-chat"
   status = 200
 
+# AI spending insights → Ollama Cloud proxy.
+[[redirects]]
+  from = "/api/insights"
+  to = "/.netlify/functions/insights"
+  status = 200
+
 # SPA fallback so client routes (e.g. /network?connect=..., /groups/:id) resolve
 # instead of 404-ing on a direct load or refresh.
 [[redirects]]

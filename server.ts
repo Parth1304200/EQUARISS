@@ -131,46 +131,69 @@ async function startServer() {
     }
   });
 
-  // API 3: Generate Witty Gen-Z Insights & Warnings from group expenses
-  app.post("/api/gemini/insights", async (req, res) => {
+  // API 3: Generate witty Gen-Z insights & warnings from group expenses (Ollama-backed).
+  app.post("/api/insights", async (req, res) => {
     try {
       const { expenses, budget, memberNames } = req.body;
-      const ai = getGeminiClient();
 
-      const textPrompt = `Configure short bullet insights analyzing this group expenses state.
-Group overall budget is ₹${budget || 0}.
-The group members are: ${JSON.stringify(memberNames || {})}.
-Here is the JSON of logged transactions: ${JSON.stringify(expenses || [])}.
-Generate exactly 3 insights/tips. Keep them short (1-2 sentences), stylish, using modern Gen Z premium slang (clean, e.g. "Goa plans are eating up budget", "Chai spend looking suspicious"). Format as an array of structured JSON. Do NOT include any emojis in the title or message fields under any circumstances.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: textPrompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                type: { type: Type.STRING, description: "one of: budget, warning, tip, chill" },
-                title: { type: Type.STRING, description: "Short micro title" },
-                message: { type: Type.STRING, description: "Funny or premium advice / status review" }
-              },
-              required: ["type", "title", "message"]
-            }
-          }
-        }
-      });
-
-      const textOutput = response.text;
-      if (!textOutput) {
-        return res.status(500).json({ error: "No insights received" });
+      const host = (process.env.OLLAMA_HOST || "https://ollama.com").replace(/\/+$/, "");
+      const model = process.env.OLLAMA_MODEL || "gpt-oss:120b";
+      const apiKey = process.env.OLLAMA_API_KEY;
+      if (host.includes("ollama.com") && !apiKey) {
+        return res.status(500).json({
+          error: "OLLAMA_API_KEY is not set. Add OLLAMA_API_KEY to your .env file.",
+        });
       }
 
-      res.json(JSON.parse(textOutput.trim()));
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+      const prompt = `You are a witty personal-finance assistant embedded in the Equaris expense-splitting app (currency: Indian Rupees, ₹).
+
+Group overall budget: ₹${budget || 0}.
+Group members (uid -> name): ${JSON.stringify(memberNames || {})}.
+Logged transactions (JSON): ${JSON.stringify(expenses || [])}.
+
+Generate EXACTLY 3 short insights or tips based ONLY on the data above. Each must be 1-2 sentences, stylish, using clean modern Gen-Z premium slang. Do NOT include emojis anywhere.
+
+Return ONLY valid JSON in exactly this shape, nothing else:
+{"insights":[{"type":"budget|warning|tip|chill","title":"short micro title","message":"the insight"}]}`;
+
+      const ollamaRes = await fetch(`${host}/api/chat`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          stream: false,
+          format: "json",
+          options: { temperature: 0.7 },
+        }),
+      });
+
+      if (!ollamaRes.ok) {
+        const detail = await ollamaRes.text();
+        return res.status(502).json({
+          error: `Insights model error (HTTP ${ollamaRes.status}). ${detail.slice(0, 300)}`,
+        });
+      }
+
+      const data: any = await ollamaRes.json();
+      const raw = data?.message?.content?.trim() || "";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return res.status(502).json({ error: "The insights model returned invalid JSON." });
+      }
+      const insights = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.insights)
+          ? parsed.insights
+          : [];
+      res.json(insights.slice(0, 3));
     } catch (err: any) {
-      console.error("Gemini Insights Error:", err);
+      console.error("Insights Error:", err);
       res.status(500).json({ error: err.message || "Failed to fetch AI insights" });
     }
   });

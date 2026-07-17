@@ -202,7 +202,7 @@ export const GroupDetail: React.FC = () => {
     if (!activeGroup || expensesOnly.length === 0) return;
     setLoadingInsights(true);
     try {
-      const res = await fetch("/api/gemini/insights", {
+      const res = await fetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
