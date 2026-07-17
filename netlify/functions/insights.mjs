@@ -4,7 +4,7 @@
  *
  * Netlify serverless function — generates 3 short spending insights from the
  * group's real expenses using Ollama Cloud (the same backend as the wallet
- * assistant). Replaces the previous Gemini-backed implementation.
+ * assistant).
  *
  * Required Netlify environment variables (Site settings → Environment variables):
  *   OLLAMA_HOST     = https://ollama.com        (Ollama Cloud; NOT localhost)

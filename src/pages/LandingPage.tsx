@@ -282,9 +282,9 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
                 <path d="M8 14h6" strokeLinecap="round" />
               </svg>
             </div>
-            <h3 className="font-heading text-xl font-bold mb-2">2. Snap & Split</h3>
+            <h3 className="font-heading text-xl font-bold mb-2">2. Log & Split</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Scan receipts using Gemini AI OCR or log custom weighted splits. Each item gets auto-assigned accurately.
+              Log an expense and split it equally, by percentage, or with custom weights. Each person's share is auto-calculated accurately.
             </p>
           </div>
 
@@ -312,7 +312,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
               Get Smart Insights About Your Group Expenses
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Our embedded Dispute Assistant uses Gemini AI to give you real-time breakdown of your balances. Instead of digging through logs, just ask!
+              Our embedded Wallet Assistant uses AI, grounded in your real data, to give you a real-time breakdown of your balances. Instead of digging through logs, just ask!
             </p>
             
             <div className="flex flex-col gap-4 mt-2">
@@ -423,7 +423,7 @@ export const LandingPage: React.FC<{ onSuccessLogin?: () => void }> = ({ onSucce
             Start Splitting Your Bills Seamlessly Today
           </h2>
           <p className="max-w-md text-sm md:text-base text-primary-foreground/80 leading-relaxed font-sans">
-            Create groups, invite companions, scan your invoices, and settle up balances with absolute transparency.
+            Create groups, invite companions, log your expenses, and settle up balances with absolute transparency.
           </p>
           <Button onClick={() => navigate("/signup")} size="lg" className="bg-background text-primary hover:bg-background/95 cursor-pointer rounded-full px-8 py-6 font-semibold mt-4 transition-transform hover:scale-105">
             START NOW
