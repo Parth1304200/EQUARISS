@@ -7,7 +7,6 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
 import { calculateBalances, generateSettlementSuggestions } from "./src/lib/settleEngine";
 
 /**
@@ -36,26 +35,6 @@ SNAPSHOT (the single source of truth):
 ${JSON.stringify(snap)}`;
 }
 
-// Lazily initialize Gemini client so we do not crash if API key is temporarily missing
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is missing. Please add it in the Secrets panel.");
-    }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        }
-      }
-    });
-  }
-  return aiClient;
-}
-
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -66,69 +45,6 @@ async function startServer() {
   // API 1: Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
-  });
-
-  // API 2: Scan Receipt via Gemini Multimodal OCR
-  app.post("/api/receipt/scan", async (req, res) => {
-    try {
-      const { imgBase64, mimeType } = req.body;
-      if (!imgBase64) {
-        return res.status(400).json({ error: "Missing required parameter 'imgBase64'" });
-      }
-
-      const ai = getGeminiClient();
-      const imagePart = {
-        inlineData: {
-          mimeType: mimeType || "image/jpeg",
-          data: imgBase64,
-        }
-      };
-
-      const textPart = {
-        text: "You are an expert OCR invoice scanner. Analyze the receipt photo, extract the store or vendor name, date (YYYY-MM-DD), category (food, travel, rent, entertainment, others), total bill amount, and individual purchase items with their costs. If values aren't clear, estimate intelligently. Format output strictly according to the requested JSON structure.",
-      };
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: { parts: [imagePart, textPart] },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "Name of the merchant/store" },
-              amount: { type: Type.NUMBER, description: "Total bill transaction amount" },
-              category: { type: Type.STRING, description: "Category: food, travel, rent, entertainment, others, healthcare" },
-              date: { type: Type.STRING, description: "Y-M-D date of purchase format" },
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Product item title" },
-                    amount: { type: Type.NUMBER, description: "Item price cost" }
-                  },
-                  required: ["name", "amount"]
-                }
-              }
-            },
-            required: ["title", "amount", "category", "date"]
-          }
-        }
-      });
-
-      const textOutput = response.text;
-      if (!textOutput) {
-        return res.status(500).json({ error: "No response text generated from model" });
-      }
-
-      const parsed = JSON.parse(textOutput.trim());
-      res.json(parsed);
-
-    } catch (err: any) {
-      console.error("Receipt Scan OCR Error:", err);
-      res.status(500).json({ error: err.message || "Failed to scan receipt image using Gemini OCR" });
-    }
   });
 
   // API 3: Generate witty Gen-Z insights & warnings from group expenses (Ollama-backed).
