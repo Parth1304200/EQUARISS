@@ -13,6 +13,8 @@ import {
   writeBatch,
   arrayUnion,
   arrayRemove,
+  query,
+  where,
 } from "firebase/firestore";
 import { dbGetDoc } from "../lib/firestoreQuery";
 import QRCode from "qrcode";
@@ -73,7 +75,7 @@ export const NetworkHub: React.FC = () => {
     `${window.location.origin}/network?connect=${encodeURIComponent(username)}`;
   const connectUrl = profile?.username ? buildConnectUrl(profile.username) : "";
 
-  // ---- Resolve a handle → full user profile via the usernames index ----
+  // ---- Resolve a handle → public user profile via the usernames index ----
   const resolveHandle = async (handle: string): Promise<any | null> => {
     const clean = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (!clean) return null;
@@ -81,10 +83,74 @@ export const NetworkHub: React.FC = () => {
     if (unameSnap && unameSnap.exists()) {
       const uid = unameSnap.data()?.uid;
       if (!uid) return null;
-      const uSnap = await dbGetDoc("users", uid);
-      if (uSnap && uSnap.exists()) return uSnap.data();
+      try {
+        const uSnap = await dbGetDoc("profiles", uid);
+        if (uSnap && uSnap.exists()) return uSnap.data();
+      } catch (e) {
+        console.warn("Profiles read failed, trying users collection", e);
+      }
+      // Fallback
+      try {
+        const userSnap = await dbGetDoc("users", uid);
+        if (userSnap && userSnap.exists()) return userSnap.data();
+      } catch (e) {
+        console.warn("Users read failed, returning stub profile", e);
+      }
+
+      // If both read attempts failed, return a stub profile constructed from the username index
+      return {
+        uid: uid,
+        username: clean,
+        name: `@${clean}`,
+        photoURL: "",
+      };
     }
     return null;
+  };
+
+  // Resolves any UID to a public profile securely using fallback strategies.
+  const resolveUidToPublicProfile = async (targetUid: string): Promise<any | null> => {
+    // 1. Try profiles
+    try {
+      const snap = await dbGetDoc("profiles", targetUid);
+      if (snap && snap.exists()) return snap.data();
+    } catch (e) {
+      console.warn("Profiles read failed in resolveUidToPublicProfile", e);
+    }
+
+    // 2. Try users fallback (authorized if friends or request is pending)
+    try {
+      const snap = await dbGetDoc("users", targetUid);
+      if (snap && snap.exists()) return snap.data();
+    } catch (e) {
+      console.warn("Users read failed in resolveUidToPublicProfile, trying usernames index next", e);
+    }
+
+    // 3. Try querying usernames index by uid (allows reverse mapping without profiles)
+    try {
+      const q = query(collection(db, "usernames"), where("uid", "==", targetUid));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        const docSnap = qSnap.docs[0];
+        const data = docSnap.data();
+        return {
+          uid: targetUid,
+          username: docSnap.id,
+          name: data.name || `@${docSnap.id}`,
+          photoURL: data.photoURL || "",
+        };
+      }
+    } catch (e) {
+      console.warn("Usernames query by uid failed", e);
+    }
+
+    // 4. Stub fallback
+    return {
+      uid: targetUid,
+      username: `user_${targetUid.slice(0, 5)}`,
+      name: "Unknown User",
+      photoURL: "",
+    };
   };
 
   // ---- Load friends / incoming / outgoing profiles from the current profile ----
@@ -96,26 +162,25 @@ export const NetworkHub: React.FC = () => {
       const receivedList = profile.receivedRequests || [];
       const sentList = profile.sentRequests || [];
 
-      const usersColRef = collection(db, "users");
-      const friendsTemp: any[] = [];
-      const incomingTemp: any[] = [];
-      const outgoingTemp: any[] = [];
-
-      const qSnap = await getDocs(usersColRef);
-      qSnap.forEach((docSnap) => {
-        const uData = docSnap.data();
-        if (friendsList.includes(uData.uid)) {
-          friendsTemp.push(uData);
-        } else if (receivedList.includes(uData.uid)) {
-          incomingTemp.push(uData);
-        } else if (sentList.includes(uData.uid)) {
-          outgoingTemp.push(uData);
-        }
+      // Fetch friends from users collection (we have permission since they are friends)
+      const friendsPromises = friendsList.map(async (uid) => {
+        const snap = await dbGetDoc("users", uid);
+        return snap && snap.exists() ? snap.data() : null;
       });
 
-      setFriendsProfiles(friendsTemp);
-      setIncomingProfiles(incomingTemp);
-      setOutgoingProfiles(outgoingTemp);
+      // Fetch requests from public profile resolver
+      const incomingPromises = receivedList.map((uid) => resolveUidToPublicProfile(uid));
+      const outgoingPromises = sentList.map((uid) => resolveUidToPublicProfile(uid));
+
+      const [friendsRes, incomingRes, outgoingRes] = await Promise.all([
+        Promise.all(friendsPromises),
+        Promise.all(incomingPromises),
+        Promise.all(outgoingPromises),
+      ]);
+
+      setFriendsProfiles(friendsRes.filter(Boolean));
+      setIncomingProfiles(incomingRes.filter(Boolean));
+      setOutgoingProfiles(outgoingRes.filter(Boolean));
     } catch (err) {
       console.error("Failed to load friend network details:", err);
     } finally {
@@ -603,7 +668,11 @@ export const NetworkHub: React.FC = () => {
                     <div className="flex flex-col">
                       <span className="text-sm font-bold leading-none font-sans">{searchedUser.name} {searchedUser.surname || ""}</span>
                       <span className="text-xs text-cyan-500 font-mono mt-0.5">@{searchedUser.username}</span>
-                      <span className="text-[10px] text-gray-400 font-mono">{searchedUser.upiId || "No UPI linked"}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {relationOf(searchedUser.uid) === "friend" || relationOf(searchedUser.uid) === "self"
+                          ? (searchedUser.upiId || "No UPI linked")
+                          : "Connect to view UPI"}
+                      </span>
                     </div>
                   </div>
 

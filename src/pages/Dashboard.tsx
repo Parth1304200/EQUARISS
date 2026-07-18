@@ -164,7 +164,10 @@ export const Dashboard: React.FC = () => {
       }
 
       const friendUid = uSnap.data()?.uid;
-      const fUserSnap = await dbGetDoc("users", friendUid);
+      let fUserSnap = await dbGetDoc("users", friendUid);
+      if (!fUserSnap || !fUserSnap.exists()) {
+        fUserSnap = await dbGetDoc("profiles", friendUid);
+      }
       const friendData = fUserSnap?.data();
       const friendName = friendData?.nickname || friendData?.name || `user_${cleanUsername}`;
 

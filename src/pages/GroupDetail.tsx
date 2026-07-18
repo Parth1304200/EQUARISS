@@ -106,7 +106,10 @@ export const GroupDetail: React.FC = () => {
       const photos: Record<string, string> = {};
       for (const uid of activeGroup.members) {
         try {
-          const userDoc = await dbGetDoc("users", uid);
+          let userDoc = await dbGetDoc("users", uid);
+          if (!userDoc || !userDoc.exists()) {
+            userDoc = await dbGetDoc("profiles", uid);
+          }
           if (userDoc?.exists()) {
             const data = userDoc.data();
             if (data?.photoURL) {
