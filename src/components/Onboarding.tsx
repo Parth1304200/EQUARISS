@@ -183,7 +183,11 @@ export const Onboarding: React.FC = () => {
       }
 
       // 2. Write the usernames reserving lock index
-      await setDoc(doc(db, "usernames", uName), { uid: user.uid });
+      await setDoc(doc(db, "usernames", uName), {
+        uid: user.uid,
+        name: `${fName} ${lName}`,
+        photoURL: user.photoURL || "",
+      });
 
       // 3. Save profile metrics
       const cleanedProfile = {
@@ -206,6 +210,16 @@ export const Onboarding: React.FC = () => {
       };
 
       await dbSetDoc("users", user.uid, cleanedProfile);
+
+      const publicProfile = {
+        uid: user.uid,
+        name: cleanedProfile.name,
+        photoURL: cleanedProfile.photoURL,
+        username: cleanedProfile.username,
+        surname: cleanedProfile.surname,
+        nickname: cleanedProfile.nickname,
+      };
+      await dbSetDoc("profiles", user.uid, publicProfile);
 
       // New accounts start with a clean slate — no seeded/sample data.
       // The profile snapshot listener flips isOnboarded → true and the app

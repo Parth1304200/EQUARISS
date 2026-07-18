@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { dbSetDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbGetDoc } from "../lib/firestoreQuery";
 import { ArrowLeft, ArrowRight, Check, Calendar, Info, Users, CreditCard, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,18 +60,13 @@ export const AddSubscription: React.FC = () => {
     const loadFriends = async () => {
       setLoadingFriends(true);
       try {
-        const list: any[] = [];
-        const q = collection(db, "users");
-        const snap = await getDocs(q);
         const friendsUids = profile.friends || [];
-        
-        snap.forEach((docSnap) => {
-          const uData = docSnap.data();
-          if (friendsUids.includes(uData.uid)) {
-            list.push(uData);
-          }
+        const promises = friendsUids.map(async (uid) => {
+          const snap = await dbGetDoc("users", uid);
+          return snap && snap.exists() ? snap.data() : null;
         });
-        setFriendsList(list);
+        const results = await Promise.all(promises);
+        setFriendsList(results.filter(Boolean));
       } catch (err) {
         console.error("Error loading eligible friends for groups:", err);
       } finally {

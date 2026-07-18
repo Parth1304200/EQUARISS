@@ -141,6 +141,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updated = { ...profile, ...updates };
       await dbSetDoc("users", user.uid, updated);
+      const publicProfile = {
+        uid: user.uid,
+        name: updated.name,
+        photoURL: updated.photoURL || "",
+        username: updated.username || "",
+      };
+      await dbSetDoc("profiles", user.uid, publicProfile);
       setProfile(updated);
     } catch (err) {
       console.error("Failed to update full profile info:", err);
@@ -183,9 +190,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const data = docSnap.data() as UserProfile;
               setProfile(data);
 
+              if (data.isOnboarded) {
+                const publicProfile = {
+                  uid: data.uid,
+                  name: data.name,
+                  photoURL: data.photoURL || "",
+                  username: data.username || "",
+                  surname: data.surname || "",
+                  nickname: data.nickname || "",
+                };
+                dbSetDoc("profiles", data.uid, publicProfile).catch(console.error);
+
+                if (data.username) {
+                  dbUpdateDoc("usernames", data.username.toLowerCase(), {
+                    uid: data.uid,
+                    name: data.name,
+                    photoURL: data.photoURL || "",
+                  }).catch(console.error);
+                }
+              }
+
               // Auto-sync Google photoURL if it differs or is missing in Firestore
               if (currentUser.photoURL && data.photoURL !== currentUser.photoURL) {
                 dbUpdateDoc("users", currentUser.uid, { photoURL: currentUser.photoURL }).catch(console.error);
+                dbUpdateDoc("profiles", currentUser.uid, { photoURL: currentUser.photoURL }).catch(console.error);
               }
 
               if (isFirstLoad) {
@@ -210,6 +238,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               };
               dbSetDoc("users", currentUser.uid, placeholder)
                 .then(() => {
+                  const publicPlaceholder = {
+                    uid: currentUser.uid,
+                    name: placeholder.name,
+                    photoURL: placeholder.photoURL,
+                    username: "",
+                  };
+                  dbSetDoc("profiles", currentUser.uid, publicPlaceholder).catch(console.error);
                   setProfile(placeholder);
                   if (isFirstLoad) {
                     isFirstLoad = false;

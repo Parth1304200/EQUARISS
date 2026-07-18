@@ -36,8 +36,13 @@ service cloud.firestore {
 
     // 1. Users collection
     match /users/{userId} {
-      allow get: if isVerifiedUser() && isValidId(userId);
-      allow list: if isVerifiedUser();
+      allow get: if isVerifiedUser() && isValidId(userId) && (
+                      userId == request.auth.uid ||
+                      existing().get('friends', []).hasAny([request.auth.uid]) ||
+                      existing().get('sentRequests', []).hasAny([request.auth.uid]) ||
+                      existing().get('receivedRequests', []).hasAny([request.auth.uid])
+                    );
+      allow list: if false;
       allow create: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
       // Two legal ways to update a user document:
       //  (a) The owner editing their own profile (identity fields locked).
@@ -86,6 +91,22 @@ service cloud.firestore {
       allow update: if isVerifiedUser() && isValidId(username) &&
                     existing().uid == request.auth.uid && incoming().uid == request.auth.uid;
       allow delete: if false;
+    }
+
+    // 1c. Profiles collection — public fields only.
+    match /profiles/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidProfile(incoming());
+      allow update: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidProfile(incoming());
+      allow delete: if false;
+    }
+
+    function isValidProfile(data) {
+      return data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+             (data.username == null || (data.username is string && data.username.size() <= 100));
     }
 
     function isValidUser(data) {

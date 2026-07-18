@@ -7,7 +7,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc } from "firebase/firestore";
-import { dbSetDoc, dbDeleteDoc } from "../lib/firestoreQuery";
+import { dbSetDoc, dbDeleteDoc, dbGetDoc } from "../lib/firestoreQuery";
 import { toast } from "sonner";
 import {
   Users,
@@ -110,18 +110,13 @@ export const Groups: React.FC = () => {
     if (!profile || !showModal) return;
     setLoadingFriends(true);
     try {
-      const list: any[] = [];
-      const q = collection(db, "users");
-      const snap = await getDocs(q);
       const friendsUids = profile.friends || [];
-
-      snap.forEach((docSnap) => {
-        const uData = docSnap.data();
-        if (friendsUids.includes(uData.uid)) {
-          list.push(uData);
-        }
+      const promises = friendsUids.map(async (uid) => {
+        const snap = await dbGetDoc("users", uid);
+        return snap && snap.exists() ? snap.data() : null;
       });
-      setFriendsList(list);
+      const results = await Promise.all(promises);
+      setFriendsList(results.filter(Boolean));
     } catch (err) {
       console.error("Error loading eligible friends for groups:", err);
     } finally {
